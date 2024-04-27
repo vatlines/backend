@@ -35,8 +35,24 @@ export class ConfigurationService {
       .getRepository(Facility)
       .save({
         id: 'NAS',
+        createdAt: new Date('1970-01-01 00:00:01'),
       })
       .then(async (nas) => {
+        const editor = new Editor();
+        editor.cid = 1369362;
+        editor.addedBy = 800000;
+        editor.facility = nas;
+        this.dataSource.getRepository(Editor).save(editor);
+
+        const position = new Position();
+        position.facility = nas;
+        position.callsignPrefix = 'AUTO_ATC';
+        position.sector = 'ALL';
+        position.name = 'NAS';
+        position.createdAt = new Date('1970-01-01 00:00:01');
+
+        const facilities: Facility[] = [];
+
         try {
           const data = (
             await firstValueFrom(
@@ -54,103 +70,74 @@ export class ConfigurationService {
               console.error('p: No facility id', facility.facility);
               return;
             }
-            this.dataSource
-              .getRepository(Facility)
-              .save({
-                id: facility.facility.id,
-                parentFacility: nas,
-              })
-              .then((artcc) => {
-                facility.facility.childFacilities.forEach((c1: any) => {
-                  if (!c1.id) {
-                    console.error('c1: no facility id', c1);
-                    return;
-                  }
-                  this.dataSource
-                    .getRepository(Facility)
-                    .save({
-                      id: c1.id,
-                      parentFacility: artcc,
-                    })
-                    .then((s1) => {
-                      c1.childFacilities.forEach((c2: any) => {
-                        if (!c2.id) {
-                          console.error('c2: no facility id', c2);
-                          return;
-                        }
-                        this.dataSource
-                          .getRepository(Facility)
-                          .save({
-                            id: c2.id,
-                            parentFacility: s1,
-                          })
-                          .then((s2) => {
-                            c2.childFacilities.forEach((c3: any) => {
-                              if (!c3.id) {
-                                console.error('c3: no facility id', c3);
-                                return;
-                              }
-                              this.dataSource
-                                .getRepository(Facility)
-                                .save({
-                                  id: c3.id,
-                                  parentFacility: s2,
-                                })
-                                .then((s3) => {
-                                  c3.childFacilities.forEach((c4: any) => {
-                                    if (!c4.id) {
-                                      console.error('c4: no facility id', c4);
-                                      return;
-                                    }
-                                    this.dataSource
-                                      .getRepository(Facility)
-                                      .save({
-                                        id: c4.id,
-                                        parentFacility: s3,
-                                      })
-                                      .then((s4) => {
-                                        c4.childFacilities.forEach(
-                                          (c5: any) => {
-                                            if (!c5.id) {
-                                              console.error(
-                                                'c5: no facility id',
-                                                c5,
-                                              );
-                                              return;
-                                            }
-                                            this.dataSource
-                                              .getRepository(Facility)
-                                              .save({
-                                                id: c5.id,
-                                                parentFacility: s4,
-                                              });
-                                          },
-                                        );
-                                      })
-                                      .catch((err) =>
-                                        this.logger.error(
-                                          `Error saving s4 ${err}`,
-                                        ),
-                                      );
-                                  });
-                                })
-                                .catch((err) =>
-                                  this.logger.error(`Error saving c3 ${err}`),
-                                );
-                            });
-                          })
-                          .catch((err) =>
-                            this.logger.error(`Error creating c2 ${err}`),
-                          );
+            this.logger.debug(`Create facility ${facility.facility.id}`);
+            const f = new Facility();
+            f.id = facility.facility.id;
+            f.childFacilities = [];
+            f.parentFacility = nas;
+            facilities.push(f);
+
+            facility.facility.childFacilities.forEach((c1: any) => {
+              if (!c1.id) return;
+
+              const c1f = new Facility();
+              c1f.id = c1.id;
+              c1f.parentFacility = f;
+              facilities.push(c1f);
+
+              c1.childFacilities.forEach((c2: any) => {
+                if (!c2.id) return;
+
+                const c2f = new Facility();
+                c2f.id = c2.id;
+                c2f.parentFacility = c1f;
+                facilities.push(c2f);
+
+                c2.childFacilities.forEach((c3: any) => {
+                  if (!c3.id) return;
+
+                  const c3f = new Facility();
+                  c3f.id = c3.id;
+                  c3f.parentFacility = c2f;
+                  facilities.push(c3f);
+
+                  c3.childFacilities.forEach((c4: any) => {
+                    if (!c4.id) return;
+
+                    this.logger.debug(`c4 Create facility ${c4.id}`);
+                    const c4f = new Facility();
+                    c4f.id = c4.id;
+                    c4f.parentFacility = c3f;
+                    facilities.push(c4f);
+
+                    c4.childFacilities.forEach((c5: any) => {
+                      if (!c5.id) return;
+
+                      this.logger.debug(`c5 Create facility ${c5.id}`);
+                      const c5f = new Facility();
+                      c5f.id = c5.id;
+                      c5f.parentFacility = c4f;
+                      facilities.push(c5f);
+
+                      c5.childFacilities.forEach((c6: any) => {
+                        if (!c6.id) return;
+
+                        this.logger.debug(`c6 Create facility ${c6.id}`);
+                        const c6f = new Facility();
+                        c6f.id = c6.id;
+                        c6f.parentFacility = c5f;
+                        facilities.push(c6f);
                       });
-                    })
-                    .catch((err) =>
-                      this.logger.error(`Error creating c1 ${err}`),
-                    );
+                    });
+                  });
                 });
-              })
-              .catch((err) => this.logger.error(`Error creating artcc ${err}`));
+              });
+            });
           });
+
+          this.logger.debug('saving artccs');
+          await this.dataSource.getRepository(Facility).save(facilities);
+          this.logger.debug('done saving artccs');
         } catch (err) {
           this.logger.error(`Error fetching ARTCCs ${err}`);
         }
