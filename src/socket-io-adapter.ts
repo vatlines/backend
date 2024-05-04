@@ -6,6 +6,8 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Server, ServerOptions, Socket } from 'socket.io';
 import { ConfigurationService } from './configuration/configuration.service';
 import { VatsimDataService } from './vatsim-data/vatsim-data.service';
+import { Position } from './configuration/entities/position.entity';
+import { instrument } from '@socket.io/admin-ui';
 
 export class SocketIOAdapter extends IoAdapter {
   private readonly logger = new Logger(SocketIOAdapter.name);
@@ -45,6 +47,19 @@ export class SocketIOAdapter extends IoAdapter {
     server.use(this.onlineMiddleware(this.vatsimService, this.logger));
     server.use(this.positionMiddleware(this.positionService, this.logger));
 
+    instrument(server, {
+      auth:
+        process.env.NODE_ENV === 'development'
+          ? false
+          : {
+              type: 'basic',
+              username: 'admin',
+              password: '123',
+            },
+      mode:
+        process.env.NODE_ENV === 'production' ? 'production' : 'development',
+    });
+
     return server;
   }
 
@@ -78,7 +93,7 @@ export class SocketIOAdapter extends IoAdapter {
     (vatsimService: VatsimDataService, logger: Logger) =>
     (socket: SocketWithAuth, next: any) => {
       if (process.env.NODE_ENV === 'development') {
-        socket.callsign = 'CHI_811_APP';
+        socket.callsign = 'CHI_Z_APP';
         next();
         return;
       }
@@ -100,18 +115,14 @@ export class SocketIOAdapter extends IoAdapter {
   positionMiddleware =
     (positionService: ConfigurationService, logger: Logger) =>
     async (socket: SocketWithAuth, next: any) => {
-      // if (process.env.NODE_ENV === 'development') {
-      //   next();
-      //   return;
-      // }
-
       try {
         const match = await positionService.findPositionByCallsignPrefix(
           socket.callsign,
         );
 
         if (match) {
-          socket.position = match.id;
+          socket.position = match;
+          socket.sector = `${match.facility.id}-${match.sector}`;
           socket.emit('config', match);
           next();
         } else {
@@ -133,7 +144,8 @@ type OnlinePayload = {
 };
 
 type ConfigPayload = {
-  position: string;
+  position: Position;
+  sector: string;
 };
 
 export type SocketWithAuth = Socket &

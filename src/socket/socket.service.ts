@@ -2,11 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigurationService } from 'src/configuration/configuration.service';
 import { Facility } from 'src/configuration/entities/facility.entity';
+import { Position } from 'src/configuration/entities/position.entity';
 
 @Injectable()
 export class SocketService {
   private readonly logger = new Logger(SocketService.name);
-  private configuration: Facility[] = [];
+  private configuration: Position[] = [];
 
   constructor(private readonly configurationService: ConfigurationService) {
     this.fetchConfiguration();
@@ -15,21 +16,19 @@ export class SocketService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   private async fetchConfiguration() {
     try {
-      const all = await this.configurationService.findAllFacilities();
+      const all = await this.configurationService.findAllPositions1();
       this.configuration = all;
+      this.logger.debug(`Refreshed cached configuration`);
     } catch (err) {
       this.logger.error(`Error fetching configuration: ${err}`);
     }
   }
 
-  getConfiguration(): Facility[] {
-    return this.configuration;
-  }
+  // getConfiguration(): Facility[] {
+  //   return this.configuration;
+  // }
 
   getPositions() {
-    return this.configuration
-      .map((d) => d.positions)
-      .filter((a) => a.length > 0)
-      .flat();
+    return this.configuration;
   }
 }

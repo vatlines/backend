@@ -4,6 +4,7 @@ import {
   Get,
   Logger,
   Post,
+  Query,
   Req,
   Res,
   Session,
@@ -26,7 +27,9 @@ export class AuthController {
   ) {}
   @Get('login')
   @UseGuards(VatsimAuthGuard)
-  doLogin() {}
+  doLogin(@Query() callbackUrl: string) {
+    this.logger.debug('proceed to login', callbackUrl);
+  }
 
   @Get('callback/vatsim')
   @UseGuards(VatsimAuthGuard)
@@ -40,11 +43,9 @@ export class AuthController {
       sameSite: false,
       maxAge: 86400000,
     });
-    // response.redirect('/auth/test');
-    response.redirect(`http://localhost:3000/?token=${token}`);
-    // response.redirect(
-    //   `${this.configService.get<string>('FRONTEND_URL')}/vatlines`,
-    // );
+    response.redirect(
+      `${this.configService.get<string>('FRONTEND_URL')}/?token=${token}`,
+    );
   }
 
   @Post('user')

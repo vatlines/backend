@@ -36,19 +36,16 @@ export class SocketGateway
 
   @WebSocketServer() io: Server;
 
-  afterInit(_server: Server) {
+  afterInit() {
     this.logger.log(`Websocket gateway initialized.`);
   }
 
-  async handleConnection(client: SocketWithAuth, ..._args: any[]) {
+  async handleConnection(client: SocketWithAuth) {
     this.logger.log(
-      `new connection ${client.cid} signed in to ${`facility`} ${`sector`} from ${client.id}. Network callsign ${client.callsign}`,
+      `new connection ${client.cid} signed in to ${client.sector} from ${client.id}. Network callsign ${client.callsign}`,
     );
 
-    client.data.position = `${`facility`}-${`sector`}`;
-    // @TODO load actual config
-    // client.emit('config', 'config');
-    client.join([`${'facility'}`, `${'facility'}-${'sector'}`]);
+    client.join([client.position.facility.id, `${client.sector}`]);
 
     this.io.emit(
       'rooms',
@@ -79,10 +76,11 @@ export class SocketGateway
   }
 
   async handleDisconnect(client: SocketWithAuth) {
-    client.rooms.forEach((room) => {
-      this.logger.debug(`${client.id} was in ${room}`);
-    });
+    this.logger.log(
+      `${client.cid} on ${client.sector} has disconnected (${client.id})`,
+    );
     if (this.sockets.indexOf(client.id) !== -1) {
+      console.log('splicing');
       this.sockets.splice(this.sockets.indexOf(client.id), 1);
     }
   }
@@ -109,7 +107,7 @@ export class SocketGateway
                 c.layouts.some(
                   (l: ConfigurationLayout) =>
                     l.button.type === ButtonType[data.type] &&
-                    l.button.target === client.position,
+                    l.button.target === client.sector,
                 ),
               ),
         );
@@ -136,7 +134,7 @@ export class SocketGateway
     }
     const target = this.io.sockets.adapter.rooms.get(data.to);
     if (!target) {
-      this.logger.error('no one connected for', data.to);
+      this.logger.error(`no one connected for ${data.to}`);
       return { result: 'error', message: `no one connected for ${data.to}` };
     }
 

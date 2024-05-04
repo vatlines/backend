@@ -11,7 +11,7 @@ COPY package.json pnpm-lock.yaml* ./
 RUN corepack enable pnpm && pnpm i --frozen-lockfile
 
 # Rebuild the source code only when needed
-FROM base AS builder
+FROM deps AS builder
 ENV NODE_ENV=development
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
@@ -27,11 +27,14 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
 
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 
 VOLUME /app/logs
 
 EXPOSE 3001
+
+HEALTHCHECK --interval=10m --timeout=5s --retries=3 \
+        CMD wget --no-verbose --tries=1 --spider http://localhost:3001 || exit 1
 
 ## https://engineeringblog.yelp.com/2016/01/dumb-init-an-init-for-docker.html
 #RUN apk add --no-cache dumb-init

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
@@ -9,6 +9,8 @@ import { ConfigurationModule } from './configuration/configuration.module';
 import { LoggerModule } from './logger/logger.module';
 import { SocketModule } from './socket/socket.module';
 import { VatsimDataModule } from './vatsim-data/vatsim-data.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { LoggerMiddleware } from './logger.middleware';
 
 @Module({
   imports: [
@@ -21,8 +23,13 @@ import { VatsimDataModule } from './vatsim-data/vatsim-data.module';
     }),
     VatsimDataModule,
     LoggerModule.forRoot(),
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggerMiddleware).forRoutes('*');
+  }
+}

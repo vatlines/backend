@@ -10,7 +10,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Button } from './button.entity';
 import { ConfigurationLayout } from './configuration-layout.entity';
 import { Position } from './position.entity';
 
@@ -51,9 +50,6 @@ export class PositionConfiguration {
 }
 
 export interface PositionConfigurationDto {
-  id: string;
   name: string;
   positions: Position[];
-  buttons: Button[];
-  layouts: ConfigurationLayout[];
 }

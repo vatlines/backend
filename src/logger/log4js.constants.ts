@@ -73,11 +73,13 @@ export const LOG4JS_DEFAULT_CONFIG: Configuration = {
       type: 'logLevelFilter',
       appender: 'info',
       level: 'info',
+      maxLevel: 'info',
     },
     justWarning: {
       type: 'logLevelFilter',
       appender: 'warn',
       level: 'warn',
+      maxLevel: 'warn',
     },
     justError: {
       type: 'logLevelFilter',
@@ -91,8 +93,8 @@ export const LOG4JS_DEFAULT_CONFIG: Configuration = {
         'console',
         'everything',
         'justInfo',
-        'justWarning',
         'justError',
+        'justWarning',
       ],
       level: 'debug',
     },

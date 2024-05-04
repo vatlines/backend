@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
-import { DataSource, UpdateResult } from 'typeorm';
+import { DataSource, In, UpdateResult } from 'typeorm';
 import { Button } from './entities/button.entity';
 import { ConfigurationLayout } from './entities/configuration-layout.entity';
 import { Editor } from './entities/editor.entity';
@@ -38,12 +38,6 @@ export class ConfigurationService {
         createdAt: new Date('1970-01-01 00:00:01'),
       })
       .then(async (nas) => {
-        const editor = new Editor();
-        editor.cid = 1369362;
-        editor.addedBy = 800000;
-        editor.facility = nas;
-        this.dataSource.getRepository(Editor).save(editor);
-
         const position = new Position();
         position.facility = nas;
         position.callsignPrefix = 'AUTO_ATC';
@@ -67,7 +61,9 @@ export class ConfigurationService {
           }
           data.forEach((facility: any) => {
             if (!facility.facility.id) {
-              console.error('p: No facility id', facility.facility);
+              this.logger.error(
+                `No facility id: ${JSON.stringify(facility.facility)}`,
+              );
               return;
             }
             this.logger.debug(`Create facility ${facility.facility.id}`);
@@ -138,6 +134,10 @@ export class ConfigurationService {
           this.logger.debug('saving artccs');
           await this.dataSource.getRepository(Facility).save(facilities);
           this.logger.debug('done saving artccs');
+          const editor = new Editor();
+          editor.cid = 1369362;
+          editor.facility = nas;
+          this.createEditor(editor, '800000');
         } catch (err) {
           this.logger.error(`Error fetching ARTCCs ${err}`);
         }
@@ -152,8 +152,21 @@ export class ConfigurationService {
     return await this.dataSource.manager.save(newF);
   }
 
+  async findOneFacility(facilityId: string) {
+    const facility = await this.dataSource.getTreeRepository(Facility).findOne({
+      where: { id: facilityId },
+    });
+    const retval = await this.dataSource
+      .getTreeRepository(Facility)
+      .findDescendants(facility!, {
+        relations: ['parentFacility', 'childFacilities', 'buttons'],
+      });
+
+    return retval;
+  }
+
   async findAllFacilities() {
-    const start = performance.now();
+    return [];
     const retval = await this.dataSource.getTreeRepository(Facility).findTrees({
       relations: [
         'parentFacility',
@@ -171,15 +184,10 @@ export class ConfigurationService {
       ],
     });
 
-    this.logger.debug(
-      `findAllFacilities took ${performance.now() - start}ms to execute`,
-    );
-
     return retval;
   }
 
   async findVisibleFacilities(cid: number) {
-    const start = performance.now();
     const approvedFacilities = await this.dataSource
       .getRepository(Editor)
       .find({
@@ -192,86 +200,39 @@ export class ConfigurationService {
     let retval: Facility[] = [];
     await Promise.all(
       approvedFacilities.map(async (editor: Editor) => {
-        const data = await this.findFacilityById(editor.facility.id);
+        const data = await this.findOneFacility(editor.facility.id);
         if (data) {
           retval = retval.concat(data);
         }
       }),
     );
-    this.logger.debug(
-      `findVisibleFacilities took ${performance.now() - start} to execute`,
-    );
-    return retval;
+
+    return retval.sort((a, b) => ('' + a.id).localeCompare(b.id));
   }
 
-  async findOneFacilityById(facilityId: string) {
-    const start = performance.now();
+  async findOneFacilityById(
+    facilityId: string,
+    relationsToLoad: string[] = [
+      'parentFacility',
+      'childFacilities',
+      'positions',
+      'editors',
+    ],
+  ) {
     const data: Facility | null = await this.dataSource
       .getTreeRepository(Facility)
       .findOne({
         where: { id: facilityId },
-        relations: [
-          'parentFacility',
-          'childFacilities',
-          'positions',
-          'positions.facility',
-          'editors',
-          'positions.configurations',
-          'positions.configurations.layouts',
-          'childFacilities.childFacilities',
-        ],
+        relations: relationsToLoad,
       });
 
-    data?.childFacilities.sort((a, b) => ('' + a.id).localeCompare(b.id));
-    data?.positions.sort((a, b) => ('' + a.sector).localeCompare(b.sector));
-
-    this.logger.debug(
-      `findOneFacilityById took ${performance.now() - start} to execute`,
-    );
+    data?.childFacilities?.sort((a, b) => ('' + a.id).localeCompare(b.id));
+    data?.positions?.sort((a, b) => ('' + a.sector).localeCompare(b.sector));
 
     return data;
   }
 
-  async findFacilityById(facilityId: string) {
-    const start = performance.now();
-    const facility: Facility | null = await this.dataSource
-      .getTreeRepository(Facility)
-      .findOne({
-        where: { id: facilityId },
-        relations: [
-          'parentFacility',
-          'childFacilities',
-          'positions',
-          'positions.facility',
-          'editors',
-          'positions.configurations',
-          'positions.configurations.layouts',
-          'childFacilities.childFacilities',
-        ],
-      });
-
-    if (!facility) throw new BadRequestException();
-
-    const data = [];
-    data.push(facility);
-    await Promise.all(
-      facility.childFacilities.map(async (cf) => {
-        const cfData = await this.findFacilityById(cf.id);
-        data.push(cfData);
-      }),
-    );
-
-    const retval = data.flat();
-
-    this.logger.debug(
-      `findFacilityById took ${performance.now() - start} to execute`,
-    );
-
-    return retval;
-  }
-
   async updateFacility(facilityId: string, facility: Facility) {
-    const start = performance.now();
     const f = new Facility();
     Object.assign(f, facility);
     f.id = facilityId;
@@ -285,29 +246,20 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.getRepository(Facility).save(f);
 
-    this.logger.debug(
-      `updateFacility took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deleteFacility(facilityId: string) {
-    const start = performance.now();
     const retval = await this.dataSource
       .getRepository(Facility)
       .softDelete(facilityId);
 
-    this.logger.debug(
-      `deleteFacility took ${performance.now() - start} to execute`,
-    );
     return retval;
   }
   //#endregion
 
   //#region Editor
   async createEditor(editor: Editor, addedBy: string) {
-    const start = performance.now();
     const e = new Editor();
     Object.assign(e, editor);
     e.addedBy = parseInt(addedBy);
@@ -321,20 +273,11 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.manager.save(e);
 
-    this.logger.debug(
-      `createEditor took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deleteEditor(editorId: string) {
-    const start = performance.now();
     const retval = await this.dataSource.getRepository(Editor).delete(editorId);
-
-    this.logger.debug(
-      `deleteEditor took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -345,8 +288,7 @@ export class ConfigurationService {
     position: Position,
     facilityId: string,
   ): Promise<Position> {
-    const start = performance.now();
-    const facility = await this.findOneFacilityById(facilityId);
+    const facility = await this.findOneFacilityById(facilityId, []);
     if (!facility) throw new BadRequestException();
 
     const p = new Position();
@@ -361,16 +303,26 @@ export class ConfigurationService {
     }
 
     const retval = await this.dataSource.manager.save(p);
-
-    this.logger.debug(
-      `createPosition took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
-  async findAllPositions(facility: string) {
+  async findAllPositions1() {
     const start = performance.now();
+    const p = await this.dataSource.getRepository(Position).find({
+      relations: [
+        'facility',
+        'configurations',
+        'configurations.layouts',
+        'configurations.layouts.button',
+      ],
+    });
+
+    console.log('all postions', performance.now() - start);
+
+    return p;
+  }
+
+  async findAllPositions(facility: string) {
     const f = await this.dataSource.getRepository(Facility).findOne({
       where: { id: facility },
       relations: {
@@ -379,31 +331,14 @@ export class ConfigurationService {
     });
     if (!f) throw new BadRequestException();
 
-    this.logger.debug(
-      `findAllPositions took ${performance.now() - start} to execute`,
-    );
-
     return f.positions;
   }
 
   async findPositionById(positionId: string): Promise<Position | null> {
-    const start = performance.now();
-
     const retval = await this.dataSource.getRepository(Position).findOne({
       where: { id: positionId },
-      relations: [
-        'facility',
-        'facility.parentFacility',
-        'configurations',
-        'configurations.layouts',
-        'configurations.layouts.button',
-        'configurations.positions',
-      ],
+      relations: ['facility', 'facility.parentFacility', 'configurations'],
     });
-
-    this.logger.debug(
-      `findPositionById took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -411,8 +346,6 @@ export class ConfigurationService {
   async findPositionByCallsignPrefix(
     callsign: string,
   ): Promise<Position | null> {
-    const start = performance.now();
-
     const all = await this.dataSource
       .getRepository(Position)
       .find({ select: ['id', 'callsignPrefix'] });
@@ -431,17 +364,12 @@ export class ConfigurationService {
         ],
       });
 
-      this.logger.debug(
-        `findPositionByCallsignPrefix took ${performance.now() - start} to execute`,
-      );
-
       return retval;
     }
     return null;
   }
 
   async findPositionByDialCode(code: string): Promise<Position | null> {
-    const start = performance.now();
     const retval = await this.dataSource.getRepository(Position).findOne({
       where: { dialCode: code },
       relations: [
@@ -453,10 +381,6 @@ export class ConfigurationService {
       ],
     });
 
-    this.logger.debug(
-      `findPositionByDialCode took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
@@ -464,7 +388,6 @@ export class ConfigurationService {
     positionId: string,
     position: Position,
   ): Promise<Position> {
-    const start = performance.now();
     const p = new Position();
     Object.assign(p, position);
     p.id = positionId;
@@ -477,23 +400,13 @@ export class ConfigurationService {
     }
     const retval = await this.dataSource.getRepository(Position).save(p);
 
-    this.logger.debug(
-      `updatePosition took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deletePosition(positionId: string): Promise<UpdateResult> {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(Position)
       .softDelete(positionId);
-
-    this.logger.debug(
-      `deletePosition took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -501,8 +414,6 @@ export class ConfigurationService {
 
   //#region Position Configuration
   async createPositionConfiguration(config: PositionConfiguration) {
-    const start = performance.now();
-
     const pc = new PositionConfiguration();
     Object.assign(pc, config);
 
@@ -515,16 +426,10 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.manager.save(pc);
 
-    this.logger.debug(
-      `createPositionConfiguration took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async findPositionConfigurationById(configId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .findOne({
@@ -532,26 +437,16 @@ export class ConfigurationService {
         relations: ['positions', 'layouts', 'layouts.button'],
       });
 
-    this.logger.debug(
-      `findPositionConfigurationById took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async findPositionConfigurationByName(name: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .findOne({
         where: { name },
         relations: ['positions', 'layouts', 'layouts.button'],
       });
-
-    this.logger.debug(
-      `findPositionConfigurationByName took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -560,24 +455,23 @@ export class ConfigurationService {
     configId: string,
     config: PositionConfigurationDto,
   ) {
-    const start = performance.now();
-    const buttons = [...config.buttons];
-    const { name, id, positions } = config;
-    const configuration = {
-      name,
-      id,
-      positions,
-    };
+    // const buttons = [...config.buttons];
+    // const { name, id, positions } = config;
+    // const configuration = {
+    //   name,
+    //   id,
+    //   positions,
+    // };
     const pc = new PositionConfiguration();
-    Object.assign(pc, configuration);
+    Object.assign(pc, config);
     pc.id = configId;
-    for (let i = 0; i < buttons.length; i++) {
-      const layout = new ConfigurationLayout();
-      layout.button = buttons[i];
-      layout.order = i;
-      layout.configuration = pc;
-      await this.saveConfigurationLayout(layout);
-    }
+    // for (let i = 0; i < buttons.length; i++) {
+    //   const layout = new ConfigurationLayout();
+    //   layout.button = buttons[i];
+    //   layout.order = i;
+    //   layout.configuration = pc;
+    //   await this.saveConfigurationLayout(layout);
+    // }
 
     const errors = await validate(pc);
     if (errors.length > 0) {
@@ -590,23 +484,13 @@ export class ConfigurationService {
       .getRepository(PositionConfiguration)
       .save(pc);
 
-    this.logger.debug(
-      `updatePositionConfiguration took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deletePositionConfiguration(configId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .softDelete(configId);
-
-    this.logger.debug(
-      `deletePositionConfiguration took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -614,7 +498,6 @@ export class ConfigurationService {
 
   //#region ConfigurationLayout
   async saveConfigurationLayout(layout: ConfigurationLayout) {
-    const start = performance.now();
     const lookup = await this.dataSource
       .getRepository(ConfigurationLayout)
       .findOne({
@@ -654,17 +537,12 @@ export class ConfigurationService {
       .getRepository(ConfigurationLayout)
       .save(l);
 
-    this.logger.debug(
-      `saveConfigurationLayout took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
   //#endregion
 
   //#region Button
   async createButton(button: Button, configurationId: string) {
-    const start = performance.now();
     // Preload information to assign to facility
     const config = await this.findPositionConfigurationById(configurationId);
     if (!config || !config.positions[0]) {
@@ -686,37 +564,21 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.manager.save(b);
 
-    this.logger.debug(
-      `createButton took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async getButtons(cid: string) {
-    const start = performance.now();
-    const visibleFacilities = await this.findVisibleFacilities(parseInt(cid));
-    if (!visibleFacilities) {
-      throw new BadRequestException(
-        'You are not authorized to view any facilities.',
-      );
-    }
+    const approvedFacilities = await this.findVisibleFacilities(parseInt(cid));
 
-    const buttons: Button[] = [];
-    await Promise.all(
-      visibleFacilities.map(async (facility) => {
-        const btns = await this.dataSource.getRepository(Button).find({
-          where: {
-            facility: {
-              id: facility.id,
-            },
-          },
-        });
-        if (btns) {
-          buttons.push(...btns);
-        }
-      }),
-    );
+    const facilities = approvedFacilities.map((f) => f.id);
+
+    const buttons = await this.dataSource.getRepository(Button).find({
+      where: {
+        facility: {
+          id: In(facilities),
+        },
+      },
+    });
 
     // Add a none button for every facility
     const noneButton = new Button();
@@ -727,32 +589,21 @@ export class ConfigurationService {
     noneButton.layouts = [];
     noneButton.id = '00000000-0000-0000-0000-000000000000';
 
-    this.logger.debug(
-      `getButtons took ${performance.now() - start} to execute`,
-    );
-
     return [
       noneButton,
-      ...buttons.sort((a, b) => ('' + a.shortName).localeCompare(b.shortName)),
+      ...buttons.sort((a, b) => ('' + a.target).localeCompare(b.target)),
     ];
   }
 
   async findButtonById(buttonId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(Button)
       .findOne({ where: { id: buttonId }, relations: ['configurations'] });
-
-    this.logger.debug(
-      `findButtonById took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
 
   async updateButton(buttonId: string, button: Button) {
-    const start = performance.now();
     const b = new Button();
     Object.assign(b, button);
     b.id = buttonId;
@@ -766,23 +617,13 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.getRepository(Button).save(b);
 
-    this.logger.debug(
-      `updateButton took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deleteButton(buttonId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(Button)
       .softDelete(buttonId);
-
-    this.logger.debug(
-      `deleteButton took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -790,7 +631,6 @@ export class ConfigurationService {
 
   //#region Authorization checks
   async isEditorOfFacility(cid: number, facilityId: string): Promise<boolean> {
-    const start = performance.now();
     const approvedFacilities = await this.dataSource
       .getRepository(Editor)
       .find({
@@ -802,9 +642,6 @@ export class ConfigurationService {
 
     if (approvedFacilities.some((f) => f.facility.id === facilityId)) {
       // Direct match
-      this.logger.debug(
-        `isEditorOfFacility took ${performance.now() - start} to execute`,
-      );
 
       return true;
     } else {
@@ -824,10 +661,6 @@ export class ConfigurationService {
       let fac = tree.parentFacility;
       while (fac) {
         if (approvedFacilities.some((f) => f.facility.id === fac.id)) {
-          this.logger.debug(
-            `isEditorOfFacility took ${performance.now() - start} to execute`,
-          );
-
           return true;
         } else {
           fac = fac.parentFacility;
@@ -836,9 +669,6 @@ export class ConfigurationService {
 
       this.logger.log(
         `${cid} is not an editor of ${facilityId} or its parents.`,
-      );
-      this.logger.debug(
-        `isEditorOfFacility took ${performance.now() - start} to execute`,
       );
 
       throw new ForbiddenException(`Not an editor for ${facilityId}`);
@@ -857,14 +687,9 @@ export class ConfigurationService {
   }
 
   async isEditorOfPosition(cid: number, positionId: string): Promise<boolean> {
-    const start = performance.now();
     const position = await this.findPositionById(positionId);
     if (!position) throw new NotFoundException();
     const retval = await this.isEditorOfFacility(cid, position.facility.id);
-
-    this.logger.debug(
-      `isEditorOfPosition took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -873,7 +698,6 @@ export class ConfigurationService {
     cid: number,
     configuration: string,
   ): Promise<boolean> {
-    const start = performance.now();
     const config = await this.findPositionConfigurationById(configuration);
     if (!config) throw new BadRequestException();
     const positions: Position[] = [];
@@ -885,10 +709,6 @@ export class ConfigurationService {
     );
 
     const retval = await this.isEditorOfPositions(cid, positions);
-
-    this.logger.debug(
-      `isEditorOfConfiguration took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }

@@ -13,7 +13,7 @@ export class PositionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     if (!request.user) return false;
-    const bodyFacility = request.body.facility;
+    const bodyFacility = request.body.facilityId;
     const paramPosition = request.params.id as string;
 
     if (bodyFacility) {
@@ -39,7 +39,7 @@ export class CreatePositionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     if (!request.user) return false;
-    const parentFacility = request.body.facility;
+    const parentFacility = request.body.facilityId;
 
     if (parentFacility) {
       return await this.configurationService.isEditorOfFacility(

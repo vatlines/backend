@@ -41,6 +41,11 @@ export class ConfigurationController {
   private readonly logger = new Logger(ConfigurationController.name);
   constructor(private readonly configurationService: ConfigurationService) {}
 
+  @Get('poop')
+  async poop() {
+    return await this.configurationService.getButtons('1000002');
+  }
+
   //#region Facility
   @Post('facility/seed')
   @UseGuards(ApiKeyGuard)
