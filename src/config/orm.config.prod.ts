@@ -23,8 +23,10 @@ export default registerAs(
       ConfigurationLayout,
       Button,
     ],
-    synchronize: process.env.NODE_ENV === 'development',
+    // synchronize: process.env.NODE_ENV === 'development',
+    synchronize: process.env.NODE_ENV !== 'production',
     // logging: true
-    maxQueryExecutionTime: 2000,
+    maxQueryExecutionTime:
+      process.env.NODE_ENV === 'production' ? 9999999 : 5000,
   }),
 );

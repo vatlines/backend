@@ -94,6 +94,7 @@ export class SocketIOAdapter extends IoAdapter {
     (socket: SocketWithAuth, next: any) => {
       if (process.env.NODE_ENV === 'development') {
         socket.callsign = 'CHI_Z_APP';
+        socket.frequency = '119.000';
         next();
         return;
       }

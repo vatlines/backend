@@ -477,12 +477,19 @@ export class ConfigurationService {
   ): Promise<Position> {
     const freq = parseInt(frequency.toString().replace('.', ''));
     const parts = callsign.split('_');
-    const match = await this.dataSource.getRepository(Position).findOne({
-      where: {
+    const match = await this.dataSource
+      .getRepository(Position)
+      .createQueryBuilder('position')
+      .where({
         frequency: freq,
         callsign: Like(`${parts[0]}_%_${parts[parts.length - 1]}`),
-      },
-    });
+      })
+      .leftJoinAndSelect('position.facility', 'facility')
+      .leftJoinAndSelect('position.configurations', 'configs')
+      .leftJoinAndSelect('configs.layouts', 'layouts')
+      .leftJoinAndSelect('layouts.button', 'button')
+      .select(['position', 'facility.id', 'configs', 'layouts', 'button'])
+      .getOne();
 
     if (!match) throw new NotFoundException();
 
@@ -575,9 +582,22 @@ export class ConfigurationService {
     configId: string,
     config: PositionConfigurationDto,
   ) {
+    const buttons = [...config.buttons];
+    const configuration = {
+      name: config.name,
+      id: configId,
+      positions: config.positions,
+    };
     const pc = new PositionConfiguration();
-    Object.assign(pc, config);
+    Object.assign(pc, configuration);
     pc.id = configId;
+    for (let i = 0; i < buttons.length; i++) {
+      const layout = new ConfigurationLayout();
+      layout.button = buttons[i];
+      layout.order = i;
+      layout.configuration = pc;
+      await this.saveConfigurationLayout(layout);
+    }
 
     const errors = await validate(pc);
     if (errors.length > 0) {

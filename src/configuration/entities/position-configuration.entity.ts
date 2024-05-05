@@ -12,6 +12,7 @@ import {
 } from 'typeorm';
 import { ConfigurationLayout } from './configuration-layout.entity';
 import { Position } from './position.entity';
+import { Button } from './button.entity';
 
 @Entity({ name: 'position_configuration' })
 export class PositionConfiguration {
@@ -52,4 +53,6 @@ export class PositionConfiguration {
 export interface PositionConfigurationDto {
   name: string;
   positions: Position[];
+  buttons: Button[];
+  layouts: ConfigurationLayout[];
 }
