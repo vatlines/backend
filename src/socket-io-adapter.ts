@@ -102,6 +102,7 @@ export class SocketIOAdapter extends IoAdapter {
         const match = vatsimService.isControllerActive(socket.cid);
         if (match) {
           socket.callsign = match.callsign;
+          socket.frequency = match.frequency;
           next();
         } else {
           next(new Error(`No active controlling session found.`));
@@ -118,6 +119,7 @@ export class SocketIOAdapter extends IoAdapter {
       try {
         const match = await positionService.findPositionByCallsignPrefix(
           socket.callsign,
+          socket.frequency,
         );
 
         if (match) {
@@ -146,6 +148,7 @@ type OnlinePayload = {
 type ConfigPayload = {
   position: Position;
   sector: string;
+  frequency: string;
 };
 
 export type SocketWithAuth = Socket &

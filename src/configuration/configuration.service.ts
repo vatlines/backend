@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
-import { DataSource, In, UpdateResult } from 'typeorm';
+import { DataSource, In, Like, UpdateResult } from 'typeorm';
 import { Button } from './entities/button.entity';
 import { ConfigurationLayout } from './entities/configuration-layout.entity';
 import { Editor } from './entities/editor.entity';
@@ -19,8 +19,7 @@ import {
   PositionConfigurationDto,
 } from './entities/position-configuration.entity';
 import { Position } from './entities/position.entity';
-import { ButtonType } from './enums';
-import { performance } from 'perf_hooks';
+import { ButtonType, PanelType } from './enums';
 
 @Injectable()
 export class ConfigurationService {
@@ -38,14 +37,17 @@ export class ConfigurationService {
         createdAt: new Date('1970-01-01 00:00:01'),
       })
       .then(async (nas) => {
+        const facilities: Facility[] = [];
+        const positions: Position[] = [];
+
         const position = new Position();
         position.facility = nas;
-        position.callsignPrefix = 'AUTO_ATC';
+        position.callsign = 'AUTO_ATC';
+        position.frequency = 136975;
         position.sector = 'ALL';
-        position.name = 'NAS';
+        position.name = 'ALL NAS';
         position.createdAt = new Date('1970-01-01 00:00:01');
-
-        const facilities: Facility[] = [];
+        position.panelType = PanelType.VSCS;
 
         try {
           const data = (
@@ -71,6 +73,24 @@ export class ConfigurationService {
             f.id = facility.facility.id;
             f.childFacilities = [];
             f.parentFacility = nas;
+            facility.facility.positions.forEach((p: any) => {
+              const position = new Position();
+              position.name = p.name;
+              position.frequency = parseInt(
+                p.frequency.toString().substr(0, 6),
+              );
+              position.callsign = p.callsign;
+              position.facility = f;
+              position.panelType = facility.eramConfiguration
+                ? PanelType.VSCS
+                : PanelType.RDVS;
+              position.sector = p.eramConfiguration
+                ? p.eramConfiguration.sectorId
+                : p.starsConfiguration
+                  ? p.starsConfiguration.sectorId
+                  : p.callsign.split('_')[p.callsign.split('_').length - 1];
+              positions.push(position);
+            });
             facilities.push(f);
 
             facility.facility.childFacilities.forEach((c1: any) => {
@@ -79,6 +99,24 @@ export class ConfigurationService {
               const c1f = new Facility();
               c1f.id = c1.id;
               c1f.parentFacility = f;
+              c1.positions.forEach((p: any) => {
+                const position = new Position();
+                position.name = p.name;
+                position.callsign = p.callsign;
+                position.frequency = parseInt(
+                  p.frequency.toString().substr(0, 6),
+                );
+                position.facility = c1f;
+                position.panelType = facility.eramConfiguration
+                  ? PanelType.VSCS
+                  : PanelType.RDVS;
+                position.sector = p.eramConfiguration
+                  ? p.eramConfiguration.sectorId
+                  : p.starsConfiguration
+                    ? p.starsConfiguration.sectorId
+                    : p.callsign.split('_')[p.callsign.split('_').length - 1];
+                positions.push(position);
+              });
               facilities.push(c1f);
 
               c1.childFacilities.forEach((c2: any) => {
@@ -87,6 +125,24 @@ export class ConfigurationService {
                 const c2f = new Facility();
                 c2f.id = c2.id;
                 c2f.parentFacility = c1f;
+                c2.positions.forEach((p: any) => {
+                  const position = new Position();
+                  position.name = p.name;
+                  position.callsign = p.callsign;
+                  position.frequency = parseInt(
+                    p.frequency.toString().substr(0, 6),
+                  );
+                  position.facility = c2f;
+                  position.panelType = facility.eramConfiguration
+                    ? PanelType.VSCS
+                    : PanelType.RDVS;
+                  position.sector = p.eramConfiguration
+                    ? p.eramConfiguration.sectorId
+                    : p.starsConfiguration
+                      ? p.starsConfiguration.sectorId
+                      : p.callsign.split('_')[p.callsign.split('_').length - 1];
+                  positions.push(position);
+                });
                 facilities.push(c2f);
 
                 c2.childFacilities.forEach((c3: any) => {
@@ -95,6 +151,26 @@ export class ConfigurationService {
                   const c3f = new Facility();
                   c3f.id = c3.id;
                   c3f.parentFacility = c2f;
+                  c3.positions.forEach((p: any) => {
+                    const position = new Position();
+                    position.name = p.name;
+                    position.callsign = p.callsign;
+                    position.frequency = parseInt(
+                      p.frequency.toString().substr(0, 6),
+                    );
+                    position.facility = c3f;
+                    position.panelType = facility.eramConfiguration
+                      ? PanelType.VSCS
+                      : PanelType.RDVS;
+                    position.sector = p.eramConfiguration
+                      ? p.eramConfiguration.sectorId
+                      : p.starsConfiguration
+                        ? p.starsConfiguration.sectorId
+                        : p.callsign.split('_')[
+                            p.callsign.split('_').length - 1
+                          ];
+                    positions.push(position);
+                  });
                   facilities.push(c3f);
 
                   c3.childFacilities.forEach((c4: any) => {
@@ -104,6 +180,26 @@ export class ConfigurationService {
                     const c4f = new Facility();
                     c4f.id = c4.id;
                     c4f.parentFacility = c3f;
+                    c4.positions.forEach((p: any) => {
+                      const position = new Position();
+                      position.name = p.name;
+                      position.callsign = p.callsign;
+                      position.frequency = parseInt(
+                        p.frequency.toString().substr(0, 6),
+                      );
+                      position.facility = c4f;
+                      position.panelType = facility.eramConfiguration
+                        ? PanelType.VSCS
+                        : PanelType.RDVS;
+                      position.sector = p.eramConfiguration
+                        ? p.eramConfiguration.sectorId
+                        : p.starsConfiguration
+                          ? p.starsConfiguration.sectorId
+                          : p.callsign.split('_')[
+                              p.callsign.split('_').length - 1
+                            ];
+                      positions.push(position);
+                    });
                     facilities.push(c4f);
 
                     c4.childFacilities.forEach((c5: any) => {
@@ -113,6 +209,26 @@ export class ConfigurationService {
                       const c5f = new Facility();
                       c5f.id = c5.id;
                       c5f.parentFacility = c4f;
+                      c5.positions.forEach((p: any) => {
+                        const position = new Position();
+                        position.name = p.name;
+                        position.frequency = parseInt(
+                          p.frequency.toString().substr(0, 6),
+                        );
+                        position.facility = c5f;
+                        position.callsign = p.callsign;
+                        position.panelType = facility.eramConfiguration
+                          ? PanelType.VSCS
+                          : PanelType.RDVS;
+                        position.sector = p.eramConfiguration
+                          ? p.eramConfiguration.sectorId
+                          : p.starsConfiguration
+                            ? p.starsConfiguration.sectorId
+                            : p.callsign.split('_')[
+                                p.callsign.split('_').length - 1
+                              ];
+                        positions.push(position);
+                      });
                       facilities.push(c5f);
 
                       c5.childFacilities.forEach((c6: any) => {
@@ -122,6 +238,26 @@ export class ConfigurationService {
                         const c6f = new Facility();
                         c6f.id = c6.id;
                         c6f.parentFacility = c5f;
+                        c6.positions.forEach((p: any) => {
+                          const position = new Position();
+                          position.name = p.name;
+                          position.callsign = p.callsign;
+                          position.frequency = parseInt(
+                            p.frequency.toString().substr(0, 6),
+                          );
+                          position.facility = c6f;
+                          position.panelType = facility.eramConfiguration
+                            ? PanelType.VSCS
+                            : PanelType.RDVS;
+                          position.sector = p.eramConfiguration
+                            ? p.eramConfiguration.sectorId
+                            : p.starsConfiguration
+                              ? p.starsConfiguration.sectorId
+                              : p.callsign.split('_')[
+                                  p.callsign.split('_').length - 1
+                                ];
+                          positions.push(position);
+                        });
                         facilities.push(c6f);
                       });
                     });
@@ -134,10 +270,21 @@ export class ConfigurationService {
           this.logger.debug('saving artccs');
           await this.dataSource.getRepository(Facility).save(facilities);
           this.logger.debug('done saving artccs');
+          this.logger.debug('saving positions');
+          await this.dataSource
+            .getRepository(Position)
+            .createQueryBuilder()
+            .insert()
+            .values(positions)
+            .orIgnore()
+            .execute();
+          this.logger.debug('done saving positions');
           const editor = new Editor();
           editor.cid = 1369362;
           editor.facility = nas;
-          this.createEditor(editor, '800000');
+          editor.addedBy = 800000;
+          await this.dataSource.getRepository(Editor).save(editor);
+          this.logger.debug('SEEDING DONE');
         } catch (err) {
           this.logger.error(`Error fetching ARTCCs ${err}`);
         }
@@ -165,28 +312,6 @@ export class ConfigurationService {
     return retval;
   }
 
-  async findAllFacilities() {
-    return [];
-    const retval = await this.dataSource.getTreeRepository(Facility).findTrees({
-      relations: [
-        'parentFacility',
-        'childFacilities',
-        'positions',
-        'editors',
-        'positions.facility',
-        'positions.configurations',
-        'positions.configurations.layouts',
-        'childFacilities.positions',
-        'childFacilities.positions.facility',
-        'childFacilities.positions.configurations',
-        'childFacilities.positions.configurations.layouts',
-        'childFacilities.childFacilities',
-      ],
-    });
-
-    return retval;
-  }
-
   async findVisibleFacilities(cid: number) {
     const approvedFacilities = await this.dataSource
       .getRepository(Editor)
@@ -210,24 +335,30 @@ export class ConfigurationService {
     return retval.sort((a, b) => ('' + a.id).localeCompare(b.id));
   }
 
-  async findOneFacilityById(
-    facilityId: string,
-    relationsToLoad: string[] = [
-      'parentFacility',
-      'childFacilities',
-      'positions',
-      'editors',
-    ],
-  ) {
+  async findOneFacilityById(facilityId: string) {
     const data: Facility | null = await this.dataSource
       .getTreeRepository(Facility)
-      .findOne({
-        where: { id: facilityId },
-        relations: relationsToLoad,
-      });
+      .createQueryBuilder('facility')
+      .where({
+        id: facilityId,
+      })
+      .leftJoinAndSelect('facility.parentFacility', 'parentFacility')
+      .leftJoinAndSelect('facility.childFacilities', 'childFacilities')
+      .leftJoinAndSelect('facility.editors', 'editors')
+      .leftJoinAndSelect('facility.positions', 'positions')
+      .select([
+        'facility',
+        'parentFacility.id',
+        'childFacilities.id',
+        'editors',
+        'positions',
+      ])
+      .getOne();
 
-    data?.childFacilities?.sort((a, b) => ('' + a.id).localeCompare(b.id));
-    data?.positions?.sort((a, b) => ('' + a.sector).localeCompare(b.sector));
+    if (!data) throw new BadRequestException();
+
+    data.childFacilities?.sort((a, b) => ('' + a.id).localeCompare(b.id));
+    data.positions?.sort((a, b) => ('' + a.sector).localeCompare(b.sector));
 
     return data;
   }
@@ -288,7 +419,7 @@ export class ConfigurationService {
     position: Position,
     facilityId: string,
   ): Promise<Position> {
-    const facility = await this.findOneFacilityById(facilityId, []);
+    const facility = await this.findOneFacilityById(facilityId);
     if (!facility) throw new BadRequestException();
 
     const p = new Position();
@@ -306,8 +437,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async findAllPositions1() {
-    const start = performance.now();
+  async findAppPositions() {
     const p = await this.dataSource.getRepository(Position).find({
       relations: [
         'facility',
@@ -317,12 +447,10 @@ export class ConfigurationService {
       ],
     });
 
-    console.log('all postions', performance.now() - start);
-
     return p;
   }
 
-  async findAllPositions(facility: string) {
+  async findAllPositionsByFacilityId(facility: string) {
     const f = await this.dataSource.getRepository(Facility).findOne({
       where: { id: facility },
       relations: {
@@ -345,28 +473,20 @@ export class ConfigurationService {
 
   async findPositionByCallsignPrefix(
     callsign: string,
-  ): Promise<Position | null> {
-    const all = await this.dataSource
-      .getRepository(Position)
-      .find({ select: ['id', 'callsignPrefix'] });
+    frequency: string | number,
+  ): Promise<Position> {
+    const freq = parseInt(frequency.toString().replace('.', ''));
+    const parts = callsign.split('_');
+    const match = await this.dataSource.getRepository(Position).findOne({
+      where: {
+        frequency: freq,
+        callsign: Like(`${parts[0]}_%_${parts[parts.length - 1]}`),
+      },
+    });
 
-    const match = all.find((p) => callsign.startsWith(p.callsignPrefix));
-    if (match) {
-      const retval = await this.dataSource.getRepository(Position).findOne({
-        where: { id: match.id },
-        relations: [
-          'facility',
-          'facility.parentFacility',
-          'configurations',
-          'configurations.layouts',
-          'configurations.layouts.button',
-          'configurations.positions',
-        ],
-      });
+    if (!match) throw new NotFoundException();
 
-      return retval;
-    }
-    return null;
+    return match;
   }
 
   async findPositionByDialCode(code: string): Promise<Position | null> {
@@ -455,23 +575,9 @@ export class ConfigurationService {
     configId: string,
     config: PositionConfigurationDto,
   ) {
-    // const buttons = [...config.buttons];
-    // const { name, id, positions } = config;
-    // const configuration = {
-    //   name,
-    //   id,
-    //   positions,
-    // };
     const pc = new PositionConfiguration();
     Object.assign(pc, config);
     pc.id = configId;
-    // for (let i = 0; i < buttons.length; i++) {
-    //   const layout = new ConfigurationLayout();
-    //   layout.button = buttons[i];
-    //   layout.order = i;
-    //   layout.configuration = pc;
-    //   await this.saveConfigurationLayout(layout);
-    // }
 
     const errors = await validate(pc);
     if (errors.length > 0) {

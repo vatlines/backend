@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigurationService } from 'src/configuration/configuration.service';
-import { Facility } from 'src/configuration/entities/facility.entity';
 import { Position } from 'src/configuration/entities/position.entity';
 
 @Injectable()
@@ -16,7 +15,7 @@ export class SocketService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   private async fetchConfiguration() {
     try {
-      const all = await this.configurationService.findAllPositions1();
+      const all = await this.configurationService.findAppPositions();
       this.configuration = all;
       this.logger.debug(`Refreshed cached configuration`);
     } catch (err) {

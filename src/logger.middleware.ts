@@ -11,7 +11,7 @@ export class LoggerMiddleware implements NestMiddleware {
 
     response.on('finish', () => {
       this.logger.debug(
-        `Took ${performance.now() - start}ms to complete request`,
+        `Took ${(performance.now() - start).toFixed(3)}ms to complete request`,
         `${request.method} ${request.path} (${response.statusCode})`,
       );
     });
