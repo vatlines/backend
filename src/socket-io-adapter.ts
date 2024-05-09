@@ -118,6 +118,14 @@ export class SocketIOAdapter extends IoAdapter {
     (positionService: ConfigurationService, logger: Logger) =>
     async (socket: SocketWithAuth, next: any) => {
       try {
+        if (process.env.NODE_ENV !== 'production') {
+          if (socket.cid == 1369362) {
+            if (Math.random() <= 0.5) {
+              socket.callsign = 'ORD_I_GND';
+              socket.frequency = '121.900';
+            }
+          }
+        }
         const match = await positionService.findPositionByCallsignPrefix(
           socket.callsign,
           socket.frequency,

@@ -51,13 +51,13 @@ export class VatsimDataService {
           logon_time: '2024-04-27T23:53:10.3574456Z',
         },
         {
-          cid: 1320703,
+          cid: 1666291,
 
-          name: 'bRiAN',
+          name: 'lucas channnnnnnnnn',
 
           callsign: 'ORD_I_GND',
 
-          frequency: '120.750',
+          frequency: '121.900',
 
           facility: 4,
 
@@ -74,7 +74,9 @@ export class VatsimDataService {
           logon_time: '2024-04-27T23:53:10.3574456Z',
         },
       ];
-      this.vatsimData = tmp;
+      if (process.env.NODE_ENV !== 'production') {
+        this.vatsimData = tmp;
+      }
     } catch (err) {
       this.logger.error(`Error downloading Vatsim data: ${err}`);
       this.vatsimData = new VatsimData();
