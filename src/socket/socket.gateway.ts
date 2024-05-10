@@ -90,16 +90,20 @@ export class SocketGateway
     @MessageBody() data: InitiateLandlineData,
     @ConnectedSocket() client: SocketWithAuth,
   ) {
+    if (data.to === client.sector || data.to === client.facility) {
+      this.logger.warn(
+        `${client.cid} (${client.id}) tried to call their own position (${data.to}) [${client.sector}]. Automatically rejecting landline.`,
+      );
+      return {
+        result: 'error',
+        message: `You cannot call your own position (${data.to}).`,
+      };
+    }
     if (
       data.type !== CALL_TYPE.RING &&
       data.type !== CALL_TYPE.INTERCOM &&
       data.type !== CALL_TYPE.CONVERTED_SHOUT
     ) {
-      console.log(data.to, client.sector);
-      if (data.to === client.sector) {
-        console.log('trying to call self. drop.');
-        return;
-      }
       // override or shout
       const matches = this.socketService
         .getPositions()
@@ -133,14 +137,14 @@ export class SocketGateway
         this.logger.error(`no matching button for ${data.to}`);
         return {
           result: 'error',
-          message: `no matching button for ${data.to}`,
+          message: `No matching button for ${data.to}.`,
         };
       }
     }
     const target = this.io.sockets.adapter.rooms.get(data.to);
     if (!target) {
       this.logger.error(`no one connected for ${data.to}`);
-      return { result: 'error', message: `no one connected for ${data.to}` };
+      return { result: 'error', message: `No one connected for ${data.to}.` };
     }
 
     const uuid = randomUUID();

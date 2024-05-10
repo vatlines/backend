@@ -133,6 +133,7 @@ export class SocketIOAdapter extends IoAdapter {
 
         if (match) {
           socket.position = match;
+          socket.facility = match.facility.id;
           socket.sector = `${match.facility.id}-${match.sector}`;
           socket.emit('config', match);
           next();
@@ -157,6 +158,7 @@ type OnlinePayload = {
 type ConfigPayload = {
   position: Position;
   sector: string;
+  facility: string;
   frequency: string;
 };
 
