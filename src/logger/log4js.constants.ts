@@ -52,7 +52,7 @@ export const LOG4JS_DEFAULT_CONFIG: Configuration = {
       fileNameSep: '-',
       layout: LOG4JS_NO_COLOR_DEFAULT_LAYOUT,
     },
-    warning: {
+    warn: {
       type: 'file',
       filename: './logs/warn.log',
       maxLogSize: '10M',
