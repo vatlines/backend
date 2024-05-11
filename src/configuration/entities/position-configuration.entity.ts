@@ -10,9 +10,9 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Button } from './button.entity';
 import { ConfigurationLayout } from './configuration-layout.entity';
 import { Position } from './position.entity';
-import { Button } from './button.entity';
 
 @Entity({ name: 'position_configuration' })
 export class PositionConfiguration {

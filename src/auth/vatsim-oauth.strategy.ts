@@ -25,11 +25,7 @@ export class VatsimStrategy extends PassportStrategy(Strategy, 'vatsim') {
     });
   }
 
-  async validate(
-    _request: Request,
-    accessToken: string,
-    _refreshToken: string,
-  ) {
+  async validate(_request: Request, accessToken: string) {
     const req = await fetch(`${this.configService.get('AUTH_URL')}/api/user`, {
       method: 'GET',
       headers: {

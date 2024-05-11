@@ -1,4 +1,5 @@
 import { HttpModule } from '@nestjs/axios';
+import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -11,7 +12,6 @@ import { Editor } from './entities/editor.entity';
 import { Facility } from './entities/facility.entity';
 import { PositionConfiguration } from './entities/position-configuration.entity';
 import { Position } from './entities/position.entity';
-import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   controllers: [ConfigurationController],

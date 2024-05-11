@@ -1,4 +1,5 @@
 import { HttpService } from '@nestjs/axios';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
   ForbiddenException,
@@ -8,6 +9,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
 import { DataSource, In, Like, UpdateResult } from 'typeorm';
@@ -21,8 +23,6 @@ import {
 } from './entities/position-configuration.entity';
 import { Position } from './entities/position.entity';
 import { ButtonType, PanelType } from './enums';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 
 @Injectable()
 export class ConfigurationService {

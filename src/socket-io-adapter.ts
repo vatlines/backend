@@ -3,12 +3,12 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { Server, ServerOptions, Socket } from 'socket.io';
-import { ConfigurationService } from './configuration/configuration.service';
-import { VatsimDataService } from './vatsim-data/vatsim-data.service';
-import { Position } from './configuration/entities/position.entity';
 import { instrument } from '@socket.io/admin-ui';
 import { createHmac } from 'crypto';
+import { Server, ServerOptions, Socket } from 'socket.io';
+import { ConfigurationService } from './configuration/configuration.service';
+import { Position } from './configuration/entities/position.entity';
+import { VatsimDataService } from './vatsim-data/vatsim-data.service';
 
 export class SocketIOAdapter extends IoAdapter {
   private readonly logger = new Logger(SocketIOAdapter.name);
