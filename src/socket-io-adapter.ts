@@ -8,6 +8,7 @@ import { ConfigurationService } from './configuration/configuration.service';
 import { VatsimDataService } from './vatsim-data/vatsim-data.service';
 import { Position } from './configuration/entities/position.entity';
 import { instrument } from '@socket.io/admin-ui';
+import { createHmac } from 'crypto';
 
 export class SocketIOAdapter extends IoAdapter {
   private readonly logger = new Logger(SocketIOAdapter.name);
@@ -135,7 +136,10 @@ export class SocketIOAdapter extends IoAdapter {
           socket.position = match;
           socket.facility = match.facility.id;
           socket.sector = `${match.facility.id}-${match.sector}`;
-          socket.emit('config', match);
+          socket.emit('config', {
+            ...match,
+            turn: this.generateTurnCredentials(socket.cid),
+          });
           next();
         } else {
           next(new Error(`No configuration found for active position.`));
@@ -145,6 +149,20 @@ export class SocketIOAdapter extends IoAdapter {
         next(new Error(`Unable to verify position configuration.`));
       }
     };
+
+  generateTurnCredentials = (cid: number) => {
+    const unixTimeStamp = parseInt(`${Date.now() / 1000}`) + 24 * 3600;
+    const username = `${unixTimeStamp}:${cid}`;
+    const hmac = createHmac('sha1', 'vatlines');
+    hmac.setEncoding('base64');
+    hmac.write(username);
+    hmac.end();
+
+    return {
+      username,
+      credential: hmac.read(),
+    };
+  };
 }
 
 type AuthPayload = {
