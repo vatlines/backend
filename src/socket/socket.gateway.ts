@@ -11,11 +11,7 @@ import {
 } from '@nestjs/websockets';
 import { randomUUID, UUID } from 'crypto';
 import { Server } from 'socket.io';
-import { ConfigurationLayout } from 'src/configuration/entities/configuration-layout.entity';
-import { PositionConfiguration } from 'src/configuration/entities/position-configuration.entity';
-import { ButtonType } from 'src/configuration/enums';
 import { SocketWithAuth } from '../socket-io-adapter';
-import { SocketService } from './socket.service';
 import {
   CALL_TYPE,
   InitiateLandlineData,
@@ -32,7 +28,7 @@ export class SocketGateway
   private activeLandlines: Landline[] = [];
   private sockets: string[] = [];
 
-  constructor(private readonly socketService: SocketService) {}
+  constructor() {}
 
   @WebSocketServer() io: Server;
 
@@ -80,7 +76,6 @@ export class SocketGateway
       `${client.cid} on ${client.sector} has disconnected (${client.id})`,
     );
     if (this.sockets.indexOf(client.id) !== -1) {
-      console.log('splicing');
       this.sockets.splice(this.sockets.indexOf(client.id), 1);
     }
   }
@@ -99,48 +94,7 @@ export class SocketGateway
         message: `You cannot call your own position (${data.to}).`,
       };
     }
-    if (
-      data.type !== CALL_TYPE.RING &&
-      data.type !== CALL_TYPE.INTERCOM &&
-      data.type !== CALL_TYPE.CONVERTED_SHOUT
-    ) {
-      // override or shout
-      const matches = this.socketService
-        .getPositions()
-        .filter((p) =>
-          data.type === CALL_TYPE.SHOUT
-            ? data.to.includes(p.facility.id)
-            : data.to.includes(p.facility.id) &&
-              data.to.includes(p.sector) &&
-              p.configurations.some((c: PositionConfiguration) =>
-                c.layouts.some(
-                  (l: ConfigurationLayout) =>
-                    l.button.type === ButtonType[data.type] &&
-                    l.button.target === client.sector,
-                ),
-              ),
-        );
-      // const match = getConfig().positions.some((p) =>
-      //   data.type === CALL_TYPE.SHOUT
-      //     ? data.to.includes(p.facility)
-      //     : data.to.includes(p.facility) &&
-      //       data.to.includes(p.sector) &&
-      //       p.configurations.some((c: PositionConfiguration) =>
-      //         c.buttons.some(
-      //           (b) =>
-      //             b.type === ButtonType[data.type] &&
-      //             b.target === client.sector,
-      //         ),
-      //       ),
-      // );
-      if (!matches) {
-        this.logger.error(`no matching button for ${data.to}`);
-        return {
-          result: 'error',
-          message: `No matching button for ${data.to}.`,
-        };
-      }
-    }
+
     const target = this.io.sockets.adapter.rooms.get(data.to);
     if (!target) {
       this.logger.error(`no one connected for ${data.to}`);

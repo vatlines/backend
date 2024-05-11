@@ -11,6 +11,7 @@ import { Editor } from './entities/editor.entity';
 import { Facility } from './entities/facility.entity';
 import { PositionConfiguration } from './entities/position-configuration.entity';
 import { Position } from './entities/position.entity';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   controllers: [ConfigurationController],
@@ -27,6 +28,7 @@ import { Position } from './entities/position.entity';
       Button,
     ]),
     HttpModule,
+    CacheModule.register(),
   ],
   exports: [TypeOrmModule, ConfigurationService],
 })

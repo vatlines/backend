@@ -33,13 +33,13 @@ VOLUME /app/logs
 
 EXPOSE 3001
 
-HEALTHCHECK --interval=10m --timeout=5s --retries=3 \
+HEALTHCHECK --interval=5m --timeout=5s --retries=3 \
         CMD wget --no-verbose --tries=1 --spider http://localhost:3001 || exit 1
 
 ## https://engineeringblog.yelp.com/2016/01/dumb-init-an-init-for-docker.html
-#RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init
 
 USER nestjs
 
-#CMD ["dumb-init", "node", "dist/main"]
-CMD ["node", "dist/main"]
+CMD ["dumb-init", "node", "dist/main"]
+# CMD ["node", "dist/main"]

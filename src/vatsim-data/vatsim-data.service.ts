@@ -24,7 +24,6 @@ export class VatsimDataService {
       ).data;
 
       this.vatsimData = data as VatsimData;
-      this.logger.debug(`Vatsim data download completed.`);
       const tmp = new VatsimData();
       tmp.controllers = [
         {

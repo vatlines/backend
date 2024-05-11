@@ -2,6 +2,7 @@ import { HttpService } from '@nestjs/axios';
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -20,6 +21,8 @@ import {
 } from './entities/position-configuration.entity';
 import { Position } from './entities/position.entity';
 import { ButtonType, PanelType } from './enums';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class ConfigurationService {
@@ -27,6 +30,7 @@ export class ConfigurationService {
   constructor(
     private dataSource: DataSource,
     private readonly httpService: HttpService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async seedData() {
@@ -471,6 +475,17 @@ export class ConfigurationService {
     return retval;
   }
 
+  async findPositionByIdOnlyFacility(
+    positionId: string,
+  ): Promise<Position | null> {
+    const retval = await this.dataSource.getRepository(Position).findOne({
+      where: { id: positionId },
+      relations: ['facility'],
+    });
+
+    return retval;
+  }
+
   async findPositionByCallsignPrefix(
     callsign: string,
     frequency: string | number,
@@ -562,6 +577,17 @@ export class ConfigurationService {
       .findOne({
         where: { id: configId },
         relations: ['positions', 'layouts', 'layouts.button'],
+      });
+
+    return retval;
+  }
+
+  async findPositionConfigurationByIdNoLayouts(configId: string) {
+    const retval = await this.dataSource
+      .getRepository(PositionConfiguration)
+      .findOne({
+        where: { id: configId },
+        relations: ['positions'],
       });
 
     return retval;
@@ -694,10 +720,13 @@ export class ConfigurationService {
   }
 
   async getButtons(cid: string) {
+    console.time('approvedFacilities');
     const approvedFacilities = await this.findVisibleFacilities(parseInt(cid));
 
     const facilities = approvedFacilities.map((f) => f.id);
+    console.timeEnd('approvedFacilities');
 
+    console.time('visibleButtons');
     const buttons = await this.dataSource.getRepository(Button).find({
       where: {
         facility: {
@@ -705,6 +734,7 @@ export class ConfigurationService {
         },
       },
     });
+    console.timeEnd('visibleButtons');
 
     // Add a none button for every facility
     const noneButton = new Button();
@@ -757,6 +787,13 @@ export class ConfigurationService {
 
   //#region Authorization checks
   async isEditorOfFacility(cid: number, facilityId: string): Promise<boolean> {
+    const cache = await this.cacheManager.get<boolean>(
+      `facility-${cid}-${facilityId}`,
+    );
+    if (cache !== undefined) {
+      this.logger.debug(`Using cache for facility, value: ${cache}`);
+      return cache;
+    }
     const approvedFacilities = await this.dataSource
       .getRepository(Editor)
       .find({
@@ -768,37 +805,39 @@ export class ConfigurationService {
 
     if (approvedFacilities.some((f) => f.facility.id === facilityId)) {
       // Direct match
-
+      this.cacheManager.set(`facility-${cid}-${facilityId}`, true);
       return true;
-    } else {
-      const target = await this.dataSource
-        .getRepository(Facility)
-        .findOne({ where: { id: facilityId } });
-      if (!target) {
-        throw new InternalServerErrorException('Error find facility');
-      }
-
-      const tree = await this.dataSource
-        .getTreeRepository(Facility)
-        .findAncestorsTree(target);
-
-      if (!tree) throw new NotFoundException('Parent Facility not found');
-
-      let fac = tree.parentFacility;
-      while (fac) {
-        if (approvedFacilities.some((f) => f.facility.id === fac.id)) {
-          return true;
-        } else {
-          fac = fac.parentFacility;
-        }
-      }
-
-      this.logger.log(
-        `${cid} is not an editor of ${facilityId} or its parents.`,
-      );
-
-      throw new ForbiddenException(`Not an editor for ${facilityId}`);
     }
+
+    const target = await this.dataSource
+      .getRepository(Facility)
+      .findOne({ where: { id: facilityId } });
+    if (!target) {
+      throw new InternalServerErrorException('Error finding facility');
+    }
+
+    const tree = await this.dataSource
+      .getTreeRepository(Facility)
+      .findAncestorsTree(target);
+
+    if (!tree) throw new NotFoundException('Parent Facility not found');
+
+    let fac = tree.parentFacility;
+    while (fac) {
+      if (approvedFacilities.some((f) => f.facility.id === fac.id)) {
+        this.cacheManager.set(`facility-${cid}-${facilityId}`, true);
+        return true;
+      } else {
+        fac = fac.parentFacility;
+      }
+    }
+
+    this.logger.warn(
+      `${cid} is not an editor of ${facilityId} or its parents.`,
+    );
+    this.cacheManager.set(`facility-${cid}-${facilityId}`, false);
+
+    throw new ForbiddenException(`Not an editor for ${facilityId}`);
   }
 
   async isEditorOfPositions(
@@ -813,9 +852,17 @@ export class ConfigurationService {
   }
 
   async isEditorOfPosition(cid: number, positionId: string): Promise<boolean> {
-    const position = await this.findPositionById(positionId);
+    const cache = await this.cacheManager.get<boolean>(
+      `position-${cid}-${positionId}`,
+    );
+    if (cache !== undefined) {
+      this.logger.debug(`Using cache for position, value: ${cache}`);
+      return cache;
+    }
+    const position = await this.findPositionByIdOnlyFacility(positionId);
     if (!position) throw new NotFoundException();
     const retval = await this.isEditorOfFacility(cid, position.facility.id);
+    this.cacheManager.set(`position-${cid}-${positionId}`, retval, 300000);
 
     return retval;
   }
@@ -824,18 +871,31 @@ export class ConfigurationService {
     cid: number,
     configuration: string,
   ): Promise<boolean> {
-    const config = await this.findPositionConfigurationById(configuration);
+    const cache = await this.cacheManager.get<boolean>(
+      `configurations-${cid}-${configuration}`,
+    );
+    if (cache !== undefined) {
+      this.logger.debug(`Using cache for configuration, value: ${cache}`);
+      return cache;
+    }
+    const config =
+      await this.findPositionConfigurationByIdNoLayouts(configuration);
     if (!config) throw new BadRequestException();
     const positions: Position[] = [];
     await Promise.all(
       config.positions.map(async (p) => {
-        const data = await this.findPositionById(p.id);
+        const data = await this.findPositionByIdOnlyFacility(p.id);
         if (data) positions.push(data);
       }),
     );
 
     const retval = await this.isEditorOfPositions(cid, positions);
 
+    this.cacheManager.set(
+      `configurations-${cid}-${configuration}`,
+      retval,
+      300000,
+    );
     return retval;
   }
   //#endregion
