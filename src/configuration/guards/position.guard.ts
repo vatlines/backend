@@ -14,7 +14,7 @@ export class PositionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     if (!request.user) return false;
     const bodyFacility = request.body.facilityId;
-    const paramPosition = request.params.id as string;
+    const paramPosition = request.params.id as number;
 
     if (bodyFacility) {
       return await this.configurationService.isEditorOfFacility(

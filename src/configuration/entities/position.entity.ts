@@ -29,8 +29,11 @@ import { PositionConfiguration } from './position-configuration.entity';
 @Entity({ name: 'position' })
 @Index('position-name_facility-idx', ['name', 'facility.id'], { unique: true })
 export class Position {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
-  id: string;
+  @PrimaryGeneratedColumn('identity', {
+    name: 'id',
+    generatedIdentity: 'BY DEFAULT',
+  })
+  id: number;
 
   @Column({ name: 'name' })
   @IsNotEmpty()

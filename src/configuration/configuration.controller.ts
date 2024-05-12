@@ -11,6 +11,7 @@ import {
   Post,
   Req,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthGuard } from 'src/auth/auth.guard';
@@ -32,11 +33,13 @@ import {
   PositionGuard,
 } from './guards';
 import { ApiKeyGuard } from './guards/api-key.guard';
+import { RequestIdInterceptor } from './id.interceptor';
 
 @Controller({
   path: 'configuration',
   version: '1',
 })
+@UseInterceptors(RequestIdInterceptor)
 export class ConfigurationController {
   private readonly logger = new Logger(ConfigurationController.name);
   constructor(private readonly configurationService: ConfigurationService) {}
@@ -103,7 +106,7 @@ export class ConfigurationController {
   @Delete('editor/:id')
   @UseGuards(AuthGuard, EditorGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id') id: number) {
     return await this.configurationService.deleteEditor(id);
   }
   //#endregion
@@ -111,7 +114,7 @@ export class ConfigurationController {
   //#region Position
   @Get('position/poop')
   async getAllPositions2() {
-    return await this.configurationService.findAllPositionsByFacilityId('C90');
+    return await this.configurationService.findAllPositionsByFacilityId('ZAU');
   }
   @Get('position/by-facility/:id')
   @UseGuards(AuthGuard, PositionGuard)
@@ -119,7 +122,7 @@ export class ConfigurationController {
     return await this.configurationService.findAllPositionsByFacilityId(id);
   }
   @Get('position/by-id/:id')
-  async getPositionById(@Param('id') id: string) {
+  async getPositionById(@Param('id') id: number) {
     return await this.configurationService.findPositionById(id);
   }
 
@@ -155,7 +158,7 @@ export class ConfigurationController {
   @UseGuards(AuthGuard, PositionGuard)
   @HttpCode(HttpStatus.OK)
   async updatePosition(
-    @Param('id') id: string,
+    @Param('id') id: number,
     @Body() input: { position: Position; facilityId: string },
   ) {
     return await this.configurationService.updatePosition(id, input.position);
@@ -164,14 +167,14 @@ export class ConfigurationController {
   @Delete('position/:id')
   @UseGuards(AuthGuard, PositionGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removePosition(@Param('id') id: string) {
+  async removePosition(@Param('id') id: number) {
     return await this.configurationService.deletePosition(id);
   }
   //#endregion
 
   //#region Position Configuration
   @Get('position-configuration/by-id/:id')
-  async getPositionConfigurationById(@Param('id') id: string) {
+  async getPositionConfigurationById(@Param('id') id: number) {
     return await this.configurationService.findPositionConfigurationById(id);
   }
   @Get('position-configuration/by-name/:id')
@@ -183,7 +186,7 @@ export class ConfigurationController {
   @UseGuards(AuthGuard, PositionConfigurationGuard)
   @HttpCode(HttpStatus.CREATED)
   async createPositionConfiguration(
-    @Body() input: { position: string; configuration: PositionConfiguration },
+    @Body() input: { position: number; configuration: PositionConfiguration },
   ) {
     return await this.configurationService.createPositionConfiguration(
       input.configuration,
@@ -194,9 +197,9 @@ export class ConfigurationController {
   @UseGuards(AuthGuard, PositionConfigurationGuard)
   @HttpCode(HttpStatus.OK)
   async updatePositionConfiguration(
-    @Param('id') id: string,
+    @Param('id') id: number,
     @Body()
-    input: { configuration: PositionConfigurationDto; positionId: string },
+    input: { configuration: PositionConfigurationDto; positionId: number },
   ) {
     return await this.configurationService.updatePositionConfiguration(
       id,
@@ -207,7 +210,7 @@ export class ConfigurationController {
   @Delete('position-configuration/:id')
   @UseGuards(AuthGuard, PositionConfigurationGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removePositionConfiguration(@Param('id') id: string) {
+  async removePositionConfiguration(@Param('id') id: number) {
     return await this.configurationService.deletePositionConfiguration(id);
   }
   //#endregion
@@ -220,7 +223,7 @@ export class ConfigurationController {
   }
 
   @Get('button/:id')
-  async getButtonById(@Param('id') id: string) {
+  async getButtonById(@Param('id') id: number) {
     return await this.configurationService.findButtonById(id);
   }
 
@@ -228,7 +231,7 @@ export class ConfigurationController {
   @UseGuards(AuthGuard, ButtonGuard)
   @HttpCode(HttpStatus.CREATED)
   async createButton(
-    @Body() input: { button: Button; configurationId: string },
+    @Body() input: { button: Button; configurationId: number },
   ) {
     return await this.configurationService.createButton(
       input.button,
@@ -240,8 +243,8 @@ export class ConfigurationController {
   @UseGuards(AuthGuard, ButtonGuard)
   @HttpCode(HttpStatus.OK)
   async updateButton(
-    @Param('id') id: string,
-    @Body() input: { button: Button; configurationId: string },
+    @Param('id') id: number,
+    @Body() input: { button: Button; configurationId: number },
   ) {
     return await this.configurationService.updateButton(id, input.button);
   }
@@ -249,7 +252,7 @@ export class ConfigurationController {
   @Delete('button/:id')
   @UseGuards(AuthGuard, ButtonGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removeButton(@Param('id') id: string) {
+  async removeButton(@Param('id') id: number) {
     return await this.configurationService.deleteButton(id);
   }
   //#endregion

@@ -14,8 +14,11 @@ import { PositionConfiguration } from './position-configuration.entity';
   unique: true,
 })
 export class ConfigurationLayout {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
-  id: string;
+  @PrimaryGeneratedColumn('identity', {
+    name: 'id',
+    generatedIdentity: 'BY DEFAULT',
+  })
+  id: number;
 
   @Column({ name: 'order' })
   @IsNotEmpty()
