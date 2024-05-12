@@ -12,8 +12,11 @@ import { Facility } from './facility.entity';
 @Entity({ name: 'editors' })
 @Index('facility_editor-idx', ['cid', 'facility.id'], { unique: true })
 export class Editor {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
-  id: string;
+  @PrimaryGeneratedColumn('identity', {
+    name: 'id',
+    generatedIdentity: 'BY DEFAULT',
+  })
+  id: number;
 
   @Column({ name: 'cid' })
   @Index('cid-idx')

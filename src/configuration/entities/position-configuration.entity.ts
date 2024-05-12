@@ -16,8 +16,11 @@ import { Position } from './position.entity';
 
 @Entity({ name: 'position_configuration' })
 export class PositionConfiguration {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
-  id: string;
+  @PrimaryGeneratedColumn('identity', {
+    name: 'id',
+    generatedIdentity: 'BY DEFAULT',
+  })
+  id: number;
 
   @Column({ name: 'name' })
   @IsNotEmpty()

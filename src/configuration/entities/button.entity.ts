@@ -22,8 +22,11 @@ import { Facility } from './facility.entity';
 
 @Entity({ name: 'button' })
 export class Button {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
-  id: string;
+  @PrimaryGeneratedColumn('identity', {
+    name: 'id',
+    generatedIdentity: 'BY DEFAULT',
+  })
+  id: number;
 
   @Column({ name: 'short_name', length: 4 })
   @IsNotEmpty()

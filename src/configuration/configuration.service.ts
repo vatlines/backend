@@ -411,7 +411,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async deleteEditor(editorId: string) {
+  async deleteEditor(editorId: number) {
     const retval = await this.dataSource.getRepository(Editor).delete(editorId);
 
     return retval;
@@ -460,13 +460,14 @@ export class ConfigurationService {
       relations: {
         positions: true,
       },
+      relationLoadStrategy: 'query',
     });
     if (!f) throw new BadRequestException();
 
     return f.positions;
   }
 
-  async findPositionById(positionId: string): Promise<Position | null> {
+  async findPositionById(positionId: number): Promise<Position | null> {
     const retval = await this.dataSource.getRepository(Position).findOne({
       where: { id: positionId },
       relations: ['facility', 'facility.parentFacility', 'configurations'],
@@ -476,7 +477,7 @@ export class ConfigurationService {
   }
 
   async findPositionByIdOnlyFacility(
-    positionId: string,
+    positionId: number,
   ): Promise<Position | null> {
     const retval = await this.dataSource.getRepository(Position).findOne({
       where: { id: positionId },
@@ -497,7 +498,7 @@ export class ConfigurationService {
       .createQueryBuilder('position')
       .where({
         frequency: freq,
-        callsign: Like(`${parts[0]}_%_${parts[parts.length - 1]}`),
+        callsign: Like(`${parts[0]}%_${parts[parts.length - 1]}`),
       })
       .leftJoinAndSelect('position.facility', 'facility')
       .leftJoinAndSelect('position.configurations', 'configs')
@@ -527,7 +528,7 @@ export class ConfigurationService {
   }
 
   async updatePosition(
-    positionId: string,
+    positionId: number,
     position: Position,
   ): Promise<Position> {
     const p = new Position();
@@ -545,7 +546,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async deletePosition(positionId: string): Promise<UpdateResult> {
+  async deletePosition(positionId: number): Promise<UpdateResult> {
     const retval = await this.dataSource
       .getRepository(Position)
       .softDelete(positionId);
@@ -571,7 +572,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async findPositionConfigurationById(configId: string) {
+  async findPositionConfigurationById(configId: number) {
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .findOne({
@@ -582,7 +583,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async findPositionConfigurationByIdNoLayouts(configId: string) {
+  async findPositionConfigurationByIdNoLayouts(configId: number) {
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .findOne({
@@ -605,7 +606,7 @@ export class ConfigurationService {
   }
 
   async updatePositionConfiguration(
-    configId: string,
+    configId: number,
     config: PositionConfigurationDto,
   ) {
     const buttons = [...config.buttons];
@@ -639,7 +640,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async deletePositionConfiguration(configId: string) {
+  async deletePositionConfiguration(configId: number) {
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .softDelete(configId);
@@ -694,7 +695,7 @@ export class ConfigurationService {
   //#endregion
 
   //#region Button
-  async createButton(button: Button, configurationId: string) {
+  async createButton(button: Button, configurationId: number) {
     // Preload information to assign to facility
     const config = await this.findPositionConfigurationById(configurationId);
     if (!config || !config.positions[0]) {
@@ -743,7 +744,7 @@ export class ConfigurationService {
     noneButton.target = 'NONE';
     noneButton.type = ButtonType.NONE;
     noneButton.layouts = [];
-    noneButton.id = '00000000-0000-0000-0000-000000000000';
+    noneButton.id = 0;
 
     return [
       noneButton,
@@ -751,7 +752,7 @@ export class ConfigurationService {
     ];
   }
 
-  async findButtonById(buttonId: string) {
+  async findButtonById(buttonId: number) {
     const retval = await this.dataSource
       .getRepository(Button)
       .findOne({ where: { id: buttonId }, relations: ['configurations'] });
@@ -759,7 +760,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async updateButton(buttonId: string, button: Button) {
+  async updateButton(buttonId: number, button: Button) {
     const b = new Button();
     Object.assign(b, button);
     b.id = buttonId;
@@ -776,7 +777,7 @@ export class ConfigurationService {
     return retval;
   }
 
-  async deleteButton(buttonId: string) {
+  async deleteButton(buttonId: number) {
     const retval = await this.dataSource
       .getRepository(Button)
       .softDelete(buttonId);
@@ -851,7 +852,7 @@ export class ConfigurationService {
     });
   }
 
-  async isEditorOfPosition(cid: number, positionId: string): Promise<boolean> {
+  async isEditorOfPosition(cid: number, positionId: number): Promise<boolean> {
     const cache = await this.cacheManager.get<boolean>(
       `position-${cid}-${positionId}`,
     );
@@ -869,7 +870,7 @@ export class ConfigurationService {
 
   async isEditorOfConfiguration(
     cid: number,
-    configuration: string,
+    configuration: number,
   ): Promise<boolean> {
     const cache = await this.cacheManager.get<boolean>(
       `configurations-${cid}-${configuration}`,
