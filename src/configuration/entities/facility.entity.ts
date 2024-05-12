@@ -29,7 +29,7 @@ export class Facility {
   @MinLength(3)
   @MaxLength(4)
   @Matches(/[A-Z]+/)
-  id: string;
+  facilityId: string;
 
   @TreeParent({ onDelete: 'CASCADE' })
   parentFacility: Facility;

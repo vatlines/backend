@@ -6,13 +6,15 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isNumber } from 'class-validator';
 import { map, Observable } from 'rxjs';
 import Sqids from 'sqids';
 
 @Injectable()
 export class RequestIdInterceptor implements NestInterceptor {
   private sqids: Sqids;
-  constructor(private readonly configService: ConfigService) {
+  private readonly configService = new ConfigService();
+  constructor() {
     this.sqids = new Sqids({
       minLength: 6,
       alphabet: this.configService.get<string>('ALPHABET'),
@@ -31,7 +33,7 @@ export class RequestIdInterceptor implements NestInterceptor {
       !request.path.includes('/configuration/facility/') &&
       request.params.id
     ) {
-      if (!isNaN(parseInt(request.params.id)) || request.params.id.length !== 6)
+      if (isNumber(request.params.id) || request.params.id.length !== 6)
         throw new BadRequestException();
       request.params.id = this.desanitizeProperties(request.params.id);
     }
@@ -39,7 +41,7 @@ export class RequestIdInterceptor implements NestInterceptor {
     return next.handle().pipe(map((data) => this.sanitizeProperties(data)));
   }
 
-  private sanitizeProperties(data: any): any {
+  public sanitizeProperties(data: any): any {
     if (Array.isArray(data)) {
       return data.map((item) => this.sanitizeProperties(item));
     }
@@ -58,7 +60,7 @@ export class RequestIdInterceptor implements NestInterceptor {
     return data;
   }
 
-  private desanitizeProperties(data: any): any {
+  public desanitizeProperties(data: any): any {
     if (Array.isArray(data)) {
       return data.map((item) => this.desanitizeProperties(item));
     }
@@ -67,11 +69,12 @@ export class RequestIdInterceptor implements NestInterceptor {
       const desanitizeData: any = {};
       for (const key in data) {
         if (key === 'id') {
-          if (!isNaN(parseInt(data[key])) || data[key].length !== 6) {
-            throw new BadRequestException();
+          if (isNumber(data[key]) || data[key].length !== 6) {
+            throw new BadRequestException(`${key} bad value: ${data[key]}`);
           }
           const replaced = this.sqids.decode(data[key]);
-          if (replaced.length === 0) throw new BadRequestException();
+          if (replaced.length === 0)
+            throw new BadRequestException(`Invalid property: ${key}`);
           desanitizeData[key] = replaced[0];
         } else {
           desanitizeData[key] = this.desanitizeProperties(data[key]);
@@ -80,8 +83,9 @@ export class RequestIdInterceptor implements NestInterceptor {
       return desanitizeData;
     } else if (typeof data === 'string' && data.length === 6) {
       const decoded = this.sqids.decode(data);
-      if (decoded.length === 0) throw new BadRequestException();
-      return this.sqids.decode(data)[0];
+      if (decoded.length !== 0) {
+        return this.sqids.decode(data)[0];
+      }
     }
     return data;
   }

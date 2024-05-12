@@ -27,7 +27,9 @@ import { Facility } from './facility.entity';
 import { PositionConfiguration } from './position-configuration.entity';
 
 @Entity({ name: 'position' })
-@Index('position-name_facility-idx', ['name', 'facility.id'], { unique: true })
+@Index('position-name_facility-idx', ['name', 'facility.facilityId'], {
+  unique: true,
+})
 export class Position {
   @PrimaryGeneratedColumn('identity', {
     name: 'id',

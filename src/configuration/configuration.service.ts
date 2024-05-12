@@ -74,7 +74,7 @@ export class ConfigurationService {
             }
             this.logger.debug(`Create facility ${facility.facility.id}`);
             const f = new Facility();
-            f.id = facility.facility.id;
+            f.facilityId = facility.facility.id;
             f.childFacilities = [];
             f.parentFacility = nas;
             facility.facility.positions.forEach((p: any) => {
@@ -101,7 +101,7 @@ export class ConfigurationService {
               if (!c1.id) return;
 
               const c1f = new Facility();
-              c1f.id = c1.id;
+              c1f.facilityId = c1.id;
               c1f.parentFacility = f;
               c1.positions.forEach((p: any) => {
                 const position = new Position();
@@ -127,7 +127,7 @@ export class ConfigurationService {
                 if (!c2.id) return;
 
                 const c2f = new Facility();
-                c2f.id = c2.id;
+                c2f.facilityId = c2.id;
                 c2f.parentFacility = c1f;
                 c2.positions.forEach((p: any) => {
                   const position = new Position();
@@ -153,7 +153,7 @@ export class ConfigurationService {
                   if (!c3.id) return;
 
                   const c3f = new Facility();
-                  c3f.id = c3.id;
+                  c3f.facilityId = c3.id;
                   c3f.parentFacility = c2f;
                   c3.positions.forEach((p: any) => {
                     const position = new Position();
@@ -182,7 +182,7 @@ export class ConfigurationService {
 
                     this.logger.debug(`c4 Create facility ${c4.id}`);
                     const c4f = new Facility();
-                    c4f.id = c4.id;
+                    c4f.facilityId = c4.id;
                     c4f.parentFacility = c3f;
                     c4.positions.forEach((p: any) => {
                       const position = new Position();
@@ -211,7 +211,7 @@ export class ConfigurationService {
 
                       this.logger.debug(`c5 Create facility ${c5.id}`);
                       const c5f = new Facility();
-                      c5f.id = c5.id;
+                      c5f.facilityId = c5.id;
                       c5f.parentFacility = c4f;
                       c5.positions.forEach((p: any) => {
                         const position = new Position();
@@ -240,7 +240,7 @@ export class ConfigurationService {
 
                         this.logger.debug(`c6 Create facility ${c6.id}`);
                         const c6f = new Facility();
-                        c6f.id = c6.id;
+                        c6f.facilityId = c6.id;
                         c6f.parentFacility = c5f;
                         c6.positions.forEach((p: any) => {
                           const position = new Position();
@@ -305,7 +305,7 @@ export class ConfigurationService {
 
   async findOneFacility(facilityId: string) {
     const facility = await this.dataSource.getTreeRepository(Facility).findOne({
-      where: { id: facilityId },
+      where: { facilityId: facilityId },
     });
     const retval = await this.dataSource
       .getTreeRepository(Facility)
@@ -329,14 +329,16 @@ export class ConfigurationService {
     let retval: Facility[] = [];
     await Promise.all(
       approvedFacilities.map(async (editor: Editor) => {
-        const data = await this.findOneFacility(editor.facility.id);
+        const data = await this.findOneFacility(editor.facility.facilityId);
         if (data) {
           retval = retval.concat(data);
         }
       }),
     );
 
-    return retval.sort((a, b) => ('' + a.id).localeCompare(b.id));
+    return retval.sort((a, b) =>
+      ('' + a.facilityId).localeCompare(b.facilityId),
+    );
   }
 
   async findOneFacilityById(facilityId: string) {
@@ -344,7 +346,7 @@ export class ConfigurationService {
       .getTreeRepository(Facility)
       .createQueryBuilder('facility')
       .where({
-        id: facilityId,
+        facilityId,
       })
       .leftJoinAndSelect('facility.parentFacility', 'parentFacility')
       .leftJoinAndSelect('facility.childFacilities', 'childFacilities')
@@ -352,8 +354,8 @@ export class ConfigurationService {
       .leftJoinAndSelect('facility.positions', 'positions')
       .select([
         'facility',
-        'parentFacility.id',
-        'childFacilities.id',
+        'parentFacility.facilityId',
+        'childFacilities.facilityId',
         'editors',
         'positions',
       ])
@@ -361,7 +363,9 @@ export class ConfigurationService {
 
     if (!data) throw new BadRequestException();
 
-    data.childFacilities?.sort((a, b) => ('' + a.id).localeCompare(b.id));
+    data.childFacilities?.sort((a, b) =>
+      ('' + a.facilityId).localeCompare(b.facilityId),
+    );
     data.positions?.sort((a, b) => ('' + a.sector).localeCompare(b.sector));
 
     return data;
@@ -370,7 +374,7 @@ export class ConfigurationService {
   async updateFacility(facilityId: string, facility: Facility) {
     const f = new Facility();
     Object.assign(f, facility);
-    f.id = facilityId;
+    f.facilityId = facilityId;
 
     const errors = await validate(f);
     if (errors.length > 0) {
@@ -454,9 +458,9 @@ export class ConfigurationService {
     return p;
   }
 
-  async findAllPositionsByFacilityId(facility: string) {
+  async findAllPositionsByFacilityId(facilityId: string) {
     const f = await this.dataSource.getRepository(Facility).findOne({
-      where: { id: facility },
+      where: { facilityId },
       relations: {
         positions: true,
       },
@@ -504,7 +508,13 @@ export class ConfigurationService {
       .leftJoinAndSelect('position.configurations', 'configs')
       .leftJoinAndSelect('configs.layouts', 'layouts')
       .leftJoinAndSelect('layouts.button', 'button')
-      .select(['position', 'facility.id', 'configs', 'layouts', 'button'])
+      .select([
+        'position',
+        'facility.facilityId',
+        'configs',
+        'layouts',
+        'button',
+      ])
       .getOne();
 
     if (!match) throw new NotFoundException();
@@ -609,7 +619,6 @@ export class ConfigurationService {
     configId: number,
     config: PositionConfigurationDto,
   ) {
-    const buttons = [...config.buttons];
     const configuration = {
       name: config.name,
       id: configId,
@@ -618,12 +627,15 @@ export class ConfigurationService {
     const pc = new PositionConfiguration();
     Object.assign(pc, configuration);
     pc.id = configId;
-    for (let i = 0; i < buttons.length; i++) {
-      const layout = new ConfigurationLayout();
-      layout.button = buttons[i];
-      layout.order = i;
-      layout.configuration = pc;
-      await this.saveConfigurationLayout(layout);
+    if (config.buttons) {
+      const buttons = [...config.buttons];
+      for (let i = 0; i < buttons.length; i++) {
+        const layout = new ConfigurationLayout();
+        layout.button = buttons[i];
+        layout.order = i;
+        layout.configuration = pc;
+        await this.saveConfigurationLayout(layout);
+      }
     }
 
     const errors = await validate(pc);
@@ -721,21 +733,17 @@ export class ConfigurationService {
   }
 
   async getButtons(cid: string) {
-    console.time('approvedFacilities');
     const approvedFacilities = await this.findVisibleFacilities(parseInt(cid));
 
-    const facilities = approvedFacilities.map((f) => f.id);
-    console.timeEnd('approvedFacilities');
+    const facilities = approvedFacilities.map((f) => f.facilityId);
 
-    console.time('visibleButtons');
     const buttons = await this.dataSource.getRepository(Button).find({
       where: {
         facility: {
-          id: In(facilities),
+          facilityId: In(facilities),
         },
       },
     });
-    console.timeEnd('visibleButtons');
 
     // Add a none button for every facility
     const noneButton = new Button();
@@ -804,7 +812,7 @@ export class ConfigurationService {
         },
       });
 
-    if (approvedFacilities.some((f) => f.facility.id === facilityId)) {
+    if (approvedFacilities.some((f) => f.facility.facilityId === facilityId)) {
       // Direct match
       this.cacheManager.set(`facility-${cid}-${facilityId}`, true);
       return true;
@@ -812,7 +820,7 @@ export class ConfigurationService {
 
     const target = await this.dataSource
       .getRepository(Facility)
-      .findOne({ where: { id: facilityId } });
+      .findOne({ where: { facilityId: facilityId } });
     if (!target) {
       throw new InternalServerErrorException('Error finding facility');
     }
@@ -825,7 +833,9 @@ export class ConfigurationService {
 
     let fac = tree.parentFacility;
     while (fac) {
-      if (approvedFacilities.some((f) => f.facility.id === fac.id)) {
+      if (
+        approvedFacilities.some((f) => f.facility.facilityId === fac.facilityId)
+      ) {
         this.cacheManager.set(`facility-${cid}-${facilityId}`, true);
         return true;
       } else {
@@ -848,7 +858,7 @@ export class ConfigurationService {
     const facilities: Facility[] = [];
     positions.forEach((p) => facilities.push(p.facility));
     return await this.asyncEvery(facilities, async (f: Facility) => {
-      return this.isEditorOfFacility(cid, f.id);
+      return this.isEditorOfFacility(cid, f.facilityId);
     });
   }
 
@@ -862,7 +872,10 @@ export class ConfigurationService {
     }
     const position = await this.findPositionByIdOnlyFacility(positionId);
     if (!position) throw new NotFoundException();
-    const retval = await this.isEditorOfFacility(cid, position.facility.id);
+    const retval = await this.isEditorOfFacility(
+      cid,
+      position.facility.facilityId,
+    );
     this.cacheManager.set(`position-${cid}-${positionId}`, retval, 300000);
 
     return retval;
