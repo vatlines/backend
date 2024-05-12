@@ -22,8 +22,11 @@ import { Facility } from './facility.entity';
 
 @Entity({ name: 'button' })
 export class Button {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
-  id: string;
+  @PrimaryGeneratedColumn('identity', {
+    name: 'id',
+    generatedIdentity: 'BY DEFAULT',
+  })
+  id: number;
 
   @Column({ name: 'short_name', length: 4 })
   @IsNotEmpty()
@@ -46,7 +49,15 @@ export class Button {
 
   @Column({
     type: 'enum',
-    enum: ['SHOUT', 'OVERRIDE', 'INTERCOM', 'RING', 'NONE', 'CONVERTED_SHOUT'],
+    enum: [
+      ButtonType.SHOUT,
+      ButtonType.OVERRIDE,
+      ButtonType.INTERCOM,
+      ButtonType.RING,
+      ButtonType.NONE,
+      ButtonType.CONVERTED_SHOUT,
+    ],
+    // enum: ['SHOUT', 'OVERRIDE', 'INTERCOM', 'RING', 'NONE', 'CONVERTED_SHOUT'],
   })
   type: ButtonType;
 

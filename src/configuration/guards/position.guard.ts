@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigurationService } from '../configuration.service';
+import { RequestIdInterceptor } from '../id.interceptor';
 
 @Injectable()
 export class PositionGuard implements CanActivate {
@@ -14,7 +15,10 @@ export class PositionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     if (!request.user) return false;
     const bodyFacility = request.body.facilityId;
-    const paramPosition = request.params.id as string;
+    const sqids = new RequestIdInterceptor();
+    const paramPosition = sqids.desanitizeProperties(
+      request.params.id,
+    ) as number;
 
     if (bodyFacility) {
       return await this.configurationService.isEditorOfFacility(

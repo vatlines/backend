@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigurationService } from '../configuration.service';
+import { RequestIdInterceptor } from '../id.interceptor';
 
 @Injectable()
 export class ButtonGuard implements CanActivate {
@@ -13,7 +14,10 @@ export class ButtonGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     if (!request.user) return false;
-    const configuration = request.body.configuration;
+    const sqids = new RequestIdInterceptor();
+    const configuration = sqids.desanitizeProperties(
+      request.body.configuration,
+    ) as number;
 
     if (configuration) {
       return await this.configurationService.isEditorOfConfiguration(

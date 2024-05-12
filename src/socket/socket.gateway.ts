@@ -41,7 +41,7 @@ export class SocketGateway
       `new connection ${client.cid} signed in to ${client.sector} from ${client.id}. Network callsign ${client.callsign}`,
     );
 
-    client.join([client.position.facility.id, `${client.sector}`]);
+    client.join([client.position.facility.facilityId, `${client.sector}`]);
 
     this.io.emit(
       'rooms',
@@ -97,7 +97,7 @@ export class SocketGateway
 
     const target = this.io.sockets.adapter.rooms.get(data.to);
     if (!target) {
-      this.logger.error(`no one connected for ${data.to}`);
+      this.logger.warn(`no one connected for ${data.to}`);
       return { result: 'error', message: `No one connected for ${data.to}.` };
     }
 

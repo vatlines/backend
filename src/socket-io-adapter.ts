@@ -134,8 +134,8 @@ export class SocketIOAdapter extends IoAdapter {
 
         if (match) {
           socket.position = match;
-          socket.facility = match.facility.id;
-          socket.sector = `${match.facility.id}-${match.sector}`;
+          socket.facility = match.facility.facilityId;
+          socket.sector = `${match.facility.facilityId}-${match.sector}`;
           socket.emit('config', {
             ...match,
             turn: this.generateTurnCredentials(socket.cid),

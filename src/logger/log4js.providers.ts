@@ -26,8 +26,6 @@ export const createLog4jsLogger = (
     const config = options.config ?? LOG4JS_DEFAULT_CONFIG;
     const logger = log4js.configure(config).getLogger();
 
-    // logger.setParseCallStackFunction(parseNestModuleCallStack);
-
     return new Log4jsLogger(logger);
   },
 });

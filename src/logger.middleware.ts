@@ -10,10 +10,12 @@ export class LoggerMiddleware implements NestMiddleware {
     const start = performance.now();
 
     response.on('finish', () => {
-      this.logger.debug(
-        `Took ${(performance.now() - start).toFixed(3)}ms to complete request`,
-        `${request.method} ${request.path} (${response.statusCode})`,
-      );
+      if (request.path !== '/') {
+        this.logger.debug(
+          `Took ${(performance.now() - start).toFixed(3)}ms to complete request`,
+          `${request.method} ${request.path} (${response.statusCode})`,
+        );
+      }
     });
 
     next();

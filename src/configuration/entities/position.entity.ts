@@ -27,10 +27,15 @@ import { Facility } from './facility.entity';
 import { PositionConfiguration } from './position-configuration.entity';
 
 @Entity({ name: 'position' })
-@Index('position-name_facility-idx', ['name', 'facility.id'], { unique: true })
+@Index('position-name_facility-idx', ['name', 'facility.facilityId'], {
+  unique: true,
+})
 export class Position {
-  @PrimaryGeneratedColumn('uuid', { name: 'id' })
-  id: string;
+  @PrimaryGeneratedColumn('identity', {
+    name: 'id',
+    generatedIdentity: 'BY DEFAULT',
+  })
+  id: number;
 
   @Column({ name: 'name' })
   @IsNotEmpty()
@@ -56,7 +61,11 @@ export class Position {
   @IsOptional()
   dialCode?: string;
 
-  @Column({ type: 'enum', enum: ['RDVS', 'VSCS'] })
+  @Column({
+    type: 'enum',
+    // enum: ['RDVS', 'VSCS']
+    enum: [PanelType.RDVS, PanelType.VSCS],
+  })
   @IsNotEmpty()
   @IsEnum(PanelType)
   panelType!: PanelType;
