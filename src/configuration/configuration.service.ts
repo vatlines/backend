@@ -37,7 +37,7 @@ export class ConfigurationService {
     this.dataSource
       .getRepository(Facility)
       .save({
-        id: 'NAS',
+        facilityId: 'NAS',
         createdAt: new Date('1970-01-01 00:00:01'),
       })
       .then(async (nas) => {

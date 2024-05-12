@@ -61,7 +61,11 @@ export class Position {
   @IsOptional()
   dialCode?: string;
 
-  @Column({ type: 'enum', enum: ['RDVS', 'VSCS'] })
+  @Column({
+    type: 'enum',
+    // enum: ['RDVS', 'VSCS']
+    enum: [PanelType.RDVS, PanelType.VSCS],
+  })
   @IsNotEmpty()
   @IsEnum(PanelType)
   panelType!: PanelType;
