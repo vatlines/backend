@@ -52,7 +52,7 @@ export const LOG4JS_DEFAULT_CONFIG: Configuration = {
       fileNameSep: '-',
       layout: LOG4JS_NO_COLOR_DEFAULT_LAYOUT,
     },
-    warning: {
+    warn: {
       type: 'file',
       filename: './logs/warn.log',
       maxLogSize: '10M',
@@ -73,11 +73,13 @@ export const LOG4JS_DEFAULT_CONFIG: Configuration = {
       type: 'logLevelFilter',
       appender: 'info',
       level: 'info',
+      maxLevel: 'info',
     },
     justWarning: {
       type: 'logLevelFilter',
       appender: 'warn',
       level: 'warn',
+      maxLevel: 'warn',
     },
     justError: {
       type: 'logLevelFilter',
@@ -91,8 +93,8 @@ export const LOG4JS_DEFAULT_CONFIG: Configuration = {
         'console',
         'everything',
         'justInfo',
-        'justWarning',
         'justError',
+        'justWarning',
       ],
       level: 'debug',
     },

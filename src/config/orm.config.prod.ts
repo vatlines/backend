@@ -25,5 +25,7 @@ export default registerAs(
     ],
     synchronize: process.env.NODE_ENV === 'development',
     // logging: true
+    maxQueryExecutionTime:
+      process.env.NODE_ENV === 'production' ? 9999999 : 5000,
   }),
 );

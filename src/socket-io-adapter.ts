@@ -3,8 +3,11 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { instrument } from '@socket.io/admin-ui';
+import { createHmac } from 'crypto';
 import { Server, ServerOptions, Socket } from 'socket.io';
 import { ConfigurationService } from './configuration/configuration.service';
+import { Position } from './configuration/entities/position.entity';
 import { VatsimDataService } from './vatsim-data/vatsim-data.service';
 
 export class SocketIOAdapter extends IoAdapter {
@@ -45,6 +48,19 @@ export class SocketIOAdapter extends IoAdapter {
     server.use(this.onlineMiddleware(this.vatsimService, this.logger));
     server.use(this.positionMiddleware(this.positionService, this.logger));
 
+    instrument(server, {
+      auth:
+        process.env.NODE_ENV === 'development'
+          ? false
+          : {
+              type: 'basic',
+              username: 'admin',
+              password: '123',
+            },
+      mode:
+        process.env.NODE_ENV === 'production' ? 'production' : 'development',
+    });
+
     return server;
   }
 
@@ -78,7 +94,8 @@ export class SocketIOAdapter extends IoAdapter {
     (vatsimService: VatsimDataService, logger: Logger) =>
     (socket: SocketWithAuth, next: any) => {
       if (process.env.NODE_ENV === 'development') {
-        socket.callsign = 'CHI_811_APP';
+        socket.callsign = 'CHI_Z_APP';
+        socket.frequency = '119.000';
         next();
         return;
       }
@@ -87,6 +104,7 @@ export class SocketIOAdapter extends IoAdapter {
         const match = vatsimService.isControllerActive(socket.cid);
         if (match) {
           socket.callsign = match.callsign;
+          socket.frequency = match.frequency;
           next();
         } else {
           next(new Error(`No active controlling session found.`));
@@ -100,19 +118,28 @@ export class SocketIOAdapter extends IoAdapter {
   positionMiddleware =
     (positionService: ConfigurationService, logger: Logger) =>
     async (socket: SocketWithAuth, next: any) => {
-      // if (process.env.NODE_ENV === 'development') {
-      //   next();
-      //   return;
-      // }
-
       try {
+        if (process.env.NODE_ENV !== 'production') {
+          if (socket.cid == 1369362) {
+            if (Math.random() <= 0.5) {
+              socket.callsign = 'ORD_I_GND';
+              socket.frequency = '121.900';
+            }
+          }
+        }
         const match = await positionService.findPositionByCallsignPrefix(
           socket.callsign,
+          socket.frequency,
         );
 
         if (match) {
-          socket.position = match.id;
-          socket.emit('config', match);
+          socket.position = match;
+          socket.facility = match.facility.id;
+          socket.sector = `${match.facility.id}-${match.sector}`;
+          socket.emit('config', {
+            ...match,
+            turn: this.generateTurnCredentials(socket.cid),
+          });
           next();
         } else {
           next(new Error(`No configuration found for active position.`));
@@ -122,6 +149,20 @@ export class SocketIOAdapter extends IoAdapter {
         next(new Error(`Unable to verify position configuration.`));
       }
     };
+
+  generateTurnCredentials = (cid: number) => {
+    const unixTimeStamp = parseInt(`${Date.now() / 1000}`) + 24 * 3600;
+    const username = `${unixTimeStamp}:${cid}`;
+    const hmac = createHmac('sha1', 'vatlines');
+    hmac.setEncoding('base64');
+    hmac.write(username);
+    hmac.end();
+
+    return {
+      username,
+      credential: hmac.read(),
+    };
+  };
 }
 
 type AuthPayload = {
@@ -133,7 +174,10 @@ type OnlinePayload = {
 };
 
 type ConfigPayload = {
-  position: string;
+  position: Position;
+  sector: string;
+  facility: string;
+  frequency: string;
 };
 
 export type SocketWithAuth = Socket &

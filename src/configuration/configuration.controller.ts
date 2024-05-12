@@ -41,6 +41,11 @@ export class ConfigurationController {
   private readonly logger = new Logger(ConfigurationController.name);
   constructor(private readonly configurationService: ConfigurationService) {}
 
+  @Get('poop')
+  async poop() {
+    return await this.configurationService.getButtons('1000002');
+  }
+
   //#region Facility
   @Post('facility/seed')
   @UseGuards(ApiKeyGuard)
@@ -57,6 +62,7 @@ export class ConfigurationController {
   }
 
   @Get('facility/:id')
+  @UseGuards(AuthGuard)
   async getFacilityById(@Param('id') id: string) {
     return await this.configurationService.findOneFacilityById(id);
   }
@@ -103,19 +109,29 @@ export class ConfigurationController {
   //#endregion
 
   //#region Position
+  @Get('position/poop')
+  async getAllPositions2() {
+    return await this.configurationService.findAllPositionsByFacilityId('C90');
+  }
   @Get('position/by-facility/:id')
   @UseGuards(AuthGuard, PositionGuard)
   async getAllPositions(@Param('id') id: string) {
-    return await this.configurationService.findAllPositions(id);
+    return await this.configurationService.findAllPositionsByFacilityId(id);
   }
   @Get('position/by-id/:id')
   async getPositionById(@Param('id') id: string) {
     return await this.configurationService.findPositionById(id);
   }
 
-  @Get('position/by-prefix/:id')
-  async getPositionByPrefix(@Param('id') id: string) {
-    return await this.configurationService.findPositionByCallsignPrefix(id);
+  @Get('position/by-callsign/:callsign/:frequency')
+  async getPositionByCallsignAndFrequency(
+    @Param('callsign') callsign: string,
+    @Param('frequency') frequency: string | number,
+  ) {
+    return await this.configurationService.findPositionByCallsignPrefix(
+      callsign,
+      frequency,
+    );
   }
 
   @Get('position/by-dial/:id')

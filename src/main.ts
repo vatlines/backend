@@ -44,8 +44,6 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  app.setGlobalPrefix('/api');
-
   await app.listen(port);
 
   logger.log(`Server running on port ${port}`);

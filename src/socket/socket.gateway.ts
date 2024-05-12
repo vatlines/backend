@@ -9,13 +9,9 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { randomUUID } from 'crypto';
+import { randomUUID, UUID } from 'crypto';
 import { Server } from 'socket.io';
-import { ConfigurationLayout } from 'src/configuration/entities/configuration-layout.entity';
-import { PositionConfiguration } from 'src/configuration/entities/position-configuration.entity';
-import { ButtonType } from 'src/configuration/enums';
 import { SocketWithAuth } from '../socket-io-adapter';
-import { SocketService } from './socket.service';
 import {
   CALL_TYPE,
   InitiateLandlineData,
@@ -32,23 +28,20 @@ export class SocketGateway
   private activeLandlines: Landline[] = [];
   private sockets: string[] = [];
 
-  constructor(private readonly socketService: SocketService) {}
+  constructor() {}
 
   @WebSocketServer() io: Server;
 
-  afterInit(_server: Server) {
+  afterInit() {
     this.logger.log(`Websocket gateway initialized.`);
   }
 
-  async handleConnection(client: SocketWithAuth, ..._args: any[]) {
+  async handleConnection(client: SocketWithAuth) {
     this.logger.log(
-      `new connection ${client.cid} signed in to ${`facility`} ${`sector`} from ${client.id}. Network callsign ${client.callsign}`,
+      `new connection ${client.cid} signed in to ${client.sector} from ${client.id}. Network callsign ${client.callsign}`,
     );
 
-    client.data.position = `${`facility`}-${`sector`}`;
-    // @TODO load actual config
-    // client.emit('config', 'config');
-    client.join([`${'facility'}`, `${'facility'}-${'sector'}`]);
+    client.join([client.position.facility.id, `${client.sector}`]);
 
     this.io.emit(
       'rooms',
@@ -62,7 +55,7 @@ export class SocketGateway
       this.activeLandlines
         .filter((l) => l.initiator === client.id)
         .forEach((l) => {
-          this.logger.log(`disconnect terminating`, l.id);
+          this.logger.log(`disconnect terminating ${l.id}`);
           this.io.emit('terminate-landline', l.id);
         });
 
@@ -79,9 +72,9 @@ export class SocketGateway
   }
 
   async handleDisconnect(client: SocketWithAuth) {
-    client.rooms.forEach((room) => {
-      this.logger.debug(`${client.id} was in ${room}`);
-    });
+    this.logger.log(
+      `${client.cid} on ${client.sector} has disconnected (${client.id})`,
+    );
     if (this.sockets.indexOf(client.id) !== -1) {
       this.sockets.splice(this.sockets.indexOf(client.id), 1);
     }
@@ -92,52 +85,20 @@ export class SocketGateway
     @MessageBody() data: InitiateLandlineData,
     @ConnectedSocket() client: SocketWithAuth,
   ) {
-    if (
-      data.type !== CALL_TYPE.RING &&
-      data.type !== CALL_TYPE.INTERCOM &&
-      data.type !== CALL_TYPE.CONVERTED_SHOUT
-    ) {
-      // override or shout
-      const matches = this.socketService
-        .getPositions()
-        .filter((p) =>
-          data.type === CALL_TYPE.SHOUT
-            ? data.to.includes(p.facility.id)
-            : data.to.includes(p.facility.id) &&
-              data.to.includes(p.sector) &&
-              p.configurations.some((c: PositionConfiguration) =>
-                c.layouts.some(
-                  (l: ConfigurationLayout) =>
-                    l.button.type === ButtonType[data.type] &&
-                    l.button.target === client.position,
-                ),
-              ),
-        );
-      // const match = getConfig().positions.some((p) =>
-      //   data.type === CALL_TYPE.SHOUT
-      //     ? data.to.includes(p.facility)
-      //     : data.to.includes(p.facility) &&
-      //       data.to.includes(p.sector) &&
-      //       p.configurations.some((c: PositionConfiguration) =>
-      //         c.buttons.some(
-      //           (b) =>
-      //             b.type === ButtonType[data.type] &&
-      //             b.target === client.data.position,
-      //         ),
-      //       ),
-      // );
-      if (!matches) {
-        this.logger.error('no matching button for', data.to);
-        return {
-          result: 'error',
-          message: `no matching button for ${data.to}`,
-        };
-      }
+    if (data.to === client.sector || data.to === client.facility) {
+      this.logger.warn(
+        `${client.cid} (${client.id}) tried to call their own position (${data.to}) [${client.sector}]. Automatically rejecting landline.`,
+      );
+      return {
+        result: 'error',
+        message: `You cannot call your own position (${data.to}).`,
+      };
     }
+
     const target = this.io.sockets.adapter.rooms.get(data.to);
     if (!target) {
-      this.logger.error('no one connected for', data.to);
-      return { result: 'error', message: `no one connected for ${data.to}` };
+      this.logger.error(`no one connected for ${data.to}`);
+      return { result: 'error', message: `No one connected for ${data.to}.` };
     }
 
     const uuid = randomUUID();
@@ -146,7 +107,7 @@ export class SocketGateway
       client.id,
       data.type,
       data.to,
-      client.data.position,
+      client.sector,
     );
     this.activeLandlines.push(landline);
 
@@ -154,8 +115,8 @@ export class SocketGateway
     this.io.in(data.to).socketsJoin(uuid);
     this.io.to(data.to).emit('incoming-landline', {
       signal: data.signalData,
-      from: client.data.position,
-      name: client.data.username,
+      from: client.sector,
+      name: client.cid,
       type: data.type,
       room: uuid,
       target: data.to,
@@ -164,29 +125,25 @@ export class SocketGateway
     switch (data.type) {
       case CALL_TYPE.SHOUT: {
         this.logger.log(
-          `${client.data.username} (${landline.from}) initiated a SHOUT to ${data.to}`,
+          `${client.cid} (${landline.from}) initiated a SHOUT to ${data.to}`,
         );
         this.io.to(data.to).emit('join-landline', uuid);
         break;
       }
       case CALL_TYPE.OVERRIDE: {
         this.logger.log(
-          `${client.data.username} (${landline.from}) initiated a OVERRIDE to ${data.to}`,
+          `${client.cid} (${landline.from}) initiated a OVERRIDE to ${data.to}`,
         );
         this.io.to(data.to).emit('join-landline', uuid);
         break;
       }
       case CALL_TYPE.INTERCOM: {
-        this.logger.log(
-          `${client.data.username} initiated a INTERCOM to ${data.to}`,
-        );
+        this.logger.log(`${client.cid} initiated a INTERCOM to ${data.to}`);
         break;
       }
       default: {
         // RING
-        this.logger.log(
-          `${client.data.username} initiated a RING to ${data.to}`,
-        );
+        this.logger.log(`${client.cid} initiated a RING to ${data.to}`);
         break;
       }
     }
@@ -200,8 +157,7 @@ export class SocketGateway
   ) {
     client.join(id);
     const targets = [...this.io.sockets.adapter.rooms.get(id)!.values()];
-    this.logger.debug(targets);
-    this.logger.log(client.id, 'answered landline', id);
+    this.logger.log(`${client.id} answered landline ${id}`);
     client.emit('join-room', {
       id,
       users: [...targets],
@@ -246,27 +202,22 @@ export class SocketGateway
       client.to(data.caller).emit('denied-landline');
       this.io.socketsLeave(data.caller);
       delete this.activeLandlines[landline];
-      this.logger.log(
-        `${client.data.username} denied landline call from ${data.caller}`,
-      );
+      this.logger.log(`${client.cid} denied landline call from ${data.caller}`);
     }
   }
 
   @SubscribeMessage('join-landline')
   async joinLandline(
-    @MessageBody() data: { target: string; initial: boolean },
+    @MessageBody() data: { target: UUID; initial: boolean },
     @ConnectedSocket() client: SocketWithAuth,
   ) {
     const landline = this.activeLandlines.find(
       (l: Landline) => l.id === data.target,
     );
     if (landline) {
-      this.logger.debug(landline.type);
       if (landline.type === CALL_TYPE.SHOUT && !data.initial) {
         this.logger.log(
-          client.id,
-          'is turning shout into landline',
-          landline.id,
+          `${client.id} is turning shout into landline ${landline.id}`,
         );
         this.io.to(landline.target).emit('left-landline');
         landline.type = CALL_TYPE.CONVERTED_SHOUT;
@@ -277,7 +228,7 @@ export class SocketGateway
         return;
       }
       client.join(landline.id);
-      this.logger.log(client.id, 'joined landline', landline.id);
+      this.logger.log(`${client.id} joined landline: ${landline.id}`);
       client.emit('joined-landline', {
         id: landline.id,
         type: landline.type,
@@ -302,7 +253,7 @@ export class SocketGateway
       (l: Landline) => l.id === target,
     );
     if (landline) {
-      this.logger.log(client.id, 'is leaving', landline.id);
+      this.logger.log(`${client.id} is leaving ${landline.id}`);
       this.io.to(landline.id).emit('left-landline', {
         id: landline.id,
         who: client.id,
@@ -316,12 +267,7 @@ export class SocketGateway
         landline.initiator === client.id
       ) {
         this.logger.log(
-          'auto terminating landline',
-          landline.id,
-          '.',
-          landline.participants.length,
-          landline.participants.length < 2,
-          landline.initiator === client.id,
+          `auto terminating landline ${landline.id}. Participants: ${landline.participants.length}, by initiator: ${landline.initiator === client.id}`,
         );
         // Essentially an empty landline apart from the participant
         // or the initiator ends the landline
@@ -334,9 +280,7 @@ export class SocketGateway
       }
     } else {
       this.logger.error(
-        client.id,
-        "tried to leave a landline that doesn't exist",
-        target,
+        `${client.id} tried to leave a landline that doesn't exist ${target}`,
       );
     }
   }
@@ -347,7 +291,7 @@ export class SocketGateway
     @ConnectedSocket() client: SocketWithAuth,
   ) {
     this.logger.log(
-      `${client.id} (${client.data.position}) is leaving a converted shout landline. Converting back to SHOUT`,
+      `${client.id} (${client.sector}) is leaving a converted shout landline. Converting back to SHOUT`,
     );
 
     const landline = this.activeLandlines.find((l) => l.id === target);
@@ -397,12 +341,11 @@ export class SocketGateway
     @MessageBody() data: SignalData,
     @ConnectedSocket() client: SocketWithAuth,
   ) {
-    this.logger.log(client.id, 'emits initial signal to peer', data.to);
+    this.logger.log(`${client.id} emits initial signal to peer ${data.to}`);
     const landline = this.activeLandlines.find((l) => l.id === data.room);
     if (!landline) {
       this.logger.warn(
-        `Got signal data for landline that doesn't exist`,
-        data.room,
+        `Got signal data for landline that doesn't exist ${data.room}`,
       );
       return;
     }
@@ -420,7 +363,7 @@ export class SocketGateway
     @MessageBody() data: SignalData,
     @ConnectedSocket() client: SocketWithAuth,
   ) {
-    this.logger.log(client.id, 'returned signal to', data.to);
+    this.logger.log(`${client.id} returned signal to ${data.to}`);
     this.io.to(data.to).emit('user-signal', {
       signal: data.signal,
       id: client.id,

@@ -51,7 +51,6 @@ export class PositionConfiguration {
 }
 
 export interface PositionConfigurationDto {
-  id: string;
   name: string;
   positions: Position[];
   buttons: Button[];

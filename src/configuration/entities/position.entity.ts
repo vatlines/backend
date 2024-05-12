@@ -1,11 +1,14 @@
 import {
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsNumberString,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import {
@@ -25,10 +28,6 @@ import { PositionConfiguration } from './position-configuration.entity';
 
 @Entity({ name: 'position' })
 @Index('position-name_facility-idx', ['name', 'facility.id'], { unique: true })
-@Index('position-sector_facility-idx', ['sector', 'facility.id'], {
-  unique: true,
-})
-@Index(['callsignPrefix'], { unique: true })
 export class Position {
   @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
@@ -42,7 +41,7 @@ export class Position {
   @IsNotEmpty()
   @IsString()
   @Matches(/[A-Z0-9]+/)
-  sector!: string;
+  sector: string;
 
   @ManyToOne(() => Facility, (facility: Facility) => facility.positions, {
     onDelete: 'RESTRICT',
@@ -62,11 +61,20 @@ export class Position {
   @IsEnum(PanelType)
   panelType!: PanelType;
 
-  @Column({ name: 'callsign_prefix' })
+  @Column({ name: 'callsign' })
   @IsNotEmpty()
   @IsString()
-  @MinLength(3)
-  callsignPrefix!: string;
+  @MinLength(6)
+  @Matches(/[A-Z_]+/)
+  callsign!: string;
+
+  @Column({ name: 'frequency' })
+  @Index()
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(118000)
+  @Max(136975)
+  frequency!: number;
 
   @ManyToMany(
     () => PositionConfiguration,

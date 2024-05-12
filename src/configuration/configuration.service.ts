@@ -1,15 +1,18 @@
 import { HttpService } from '@nestjs/axios';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
-import { DataSource, UpdateResult } from 'typeorm';
+import { DataSource, In, Like, UpdateResult } from 'typeorm';
 import { Button } from './entities/button.entity';
 import { ConfigurationLayout } from './entities/configuration-layout.entity';
 import { Editor } from './entities/editor.entity';
@@ -19,8 +22,7 @@ import {
   PositionConfigurationDto,
 } from './entities/position-configuration.entity';
 import { Position } from './entities/position.entity';
-import { ButtonType } from './enums';
-import { performance } from 'perf_hooks';
+import { ButtonType, PanelType } from './enums';
 
 @Injectable()
 export class ConfigurationService {
@@ -28,6 +30,7 @@ export class ConfigurationService {
   constructor(
     private dataSource: DataSource,
     private readonly httpService: HttpService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async seedData() {
@@ -35,8 +38,21 @@ export class ConfigurationService {
       .getRepository(Facility)
       .save({
         id: 'NAS',
+        createdAt: new Date('1970-01-01 00:00:01'),
       })
       .then(async (nas) => {
+        const facilities: Facility[] = [];
+        const positions: Position[] = [];
+
+        const position = new Position();
+        position.facility = nas;
+        position.callsign = 'AUTO_ATC';
+        position.frequency = 136975;
+        position.sector = 'ALL';
+        position.name = 'ALL NAS';
+        position.createdAt = new Date('1970-01-01 00:00:01');
+        position.panelType = PanelType.VSCS;
+
         try {
           const data = (
             await firstValueFrom(
@@ -51,106 +67,228 @@ export class ConfigurationService {
           }
           data.forEach((facility: any) => {
             if (!facility.facility.id) {
-              console.error('p: No facility id', facility.facility);
+              this.logger.error(
+                `No facility id: ${JSON.stringify(facility.facility)}`,
+              );
               return;
             }
-            this.dataSource
-              .getRepository(Facility)
-              .save({
-                id: facility.facility.id,
-                parentFacility: nas,
-              })
-              .then((artcc) => {
-                facility.facility.childFacilities.forEach((c1: any) => {
-                  if (!c1.id) {
-                    console.error('c1: no facility id', c1);
-                    return;
-                  }
-                  this.dataSource
-                    .getRepository(Facility)
-                    .save({
-                      id: c1.id,
-                      parentFacility: artcc,
-                    })
-                    .then((s1) => {
-                      c1.childFacilities.forEach((c2: any) => {
-                        if (!c2.id) {
-                          console.error('c2: no facility id', c2);
-                          return;
-                        }
-                        this.dataSource
-                          .getRepository(Facility)
-                          .save({
-                            id: c2.id,
-                            parentFacility: s1,
-                          })
-                          .then((s2) => {
-                            c2.childFacilities.forEach((c3: any) => {
-                              if (!c3.id) {
-                                console.error('c3: no facility id', c3);
-                                return;
-                              }
-                              this.dataSource
-                                .getRepository(Facility)
-                                .save({
-                                  id: c3.id,
-                                  parentFacility: s2,
-                                })
-                                .then((s3) => {
-                                  c3.childFacilities.forEach((c4: any) => {
-                                    if (!c4.id) {
-                                      console.error('c4: no facility id', c4);
-                                      return;
-                                    }
-                                    this.dataSource
-                                      .getRepository(Facility)
-                                      .save({
-                                        id: c4.id,
-                                        parentFacility: s3,
-                                      })
-                                      .then((s4) => {
-                                        c4.childFacilities.forEach(
-                                          (c5: any) => {
-                                            if (!c5.id) {
-                                              console.error(
-                                                'c5: no facility id',
-                                                c5,
-                                              );
-                                              return;
-                                            }
-                                            this.dataSource
-                                              .getRepository(Facility)
-                                              .save({
-                                                id: c5.id,
-                                                parentFacility: s4,
-                                              });
-                                          },
-                                        );
-                                      })
-                                      .catch((err) =>
-                                        this.logger.error(
-                                          `Error saving s4 ${err}`,
-                                        ),
-                                      );
-                                  });
-                                })
-                                .catch((err) =>
-                                  this.logger.error(`Error saving c3 ${err}`),
-                                );
-                            });
-                          })
-                          .catch((err) =>
-                            this.logger.error(`Error creating c2 ${err}`),
-                          );
-                      });
-                    })
-                    .catch((err) =>
-                      this.logger.error(`Error creating c1 ${err}`),
-                    );
+            this.logger.debug(`Create facility ${facility.facility.id}`);
+            const f = new Facility();
+            f.id = facility.facility.id;
+            f.childFacilities = [];
+            f.parentFacility = nas;
+            facility.facility.positions.forEach((p: any) => {
+              const position = new Position();
+              position.name = p.name;
+              position.frequency = parseInt(
+                p.frequency.toString().substr(0, 6),
+              );
+              position.callsign = p.callsign;
+              position.facility = f;
+              position.panelType = facility.eramConfiguration
+                ? PanelType.VSCS
+                : PanelType.RDVS;
+              position.sector = p.eramConfiguration
+                ? p.eramConfiguration.sectorId
+                : p.starsConfiguration
+                  ? p.starsConfiguration.sectorId
+                  : p.callsign.split('_')[p.callsign.split('_').length - 1];
+              positions.push(position);
+            });
+            facilities.push(f);
+
+            facility.facility.childFacilities.forEach((c1: any) => {
+              if (!c1.id) return;
+
+              const c1f = new Facility();
+              c1f.id = c1.id;
+              c1f.parentFacility = f;
+              c1.positions.forEach((p: any) => {
+                const position = new Position();
+                position.name = p.name;
+                position.callsign = p.callsign;
+                position.frequency = parseInt(
+                  p.frequency.toString().substr(0, 6),
+                );
+                position.facility = c1f;
+                position.panelType = facility.eramConfiguration
+                  ? PanelType.VSCS
+                  : PanelType.RDVS;
+                position.sector = p.eramConfiguration
+                  ? p.eramConfiguration.sectorId
+                  : p.starsConfiguration
+                    ? p.starsConfiguration.sectorId
+                    : p.callsign.split('_')[p.callsign.split('_').length - 1];
+                positions.push(position);
+              });
+              facilities.push(c1f);
+
+              c1.childFacilities.forEach((c2: any) => {
+                if (!c2.id) return;
+
+                const c2f = new Facility();
+                c2f.id = c2.id;
+                c2f.parentFacility = c1f;
+                c2.positions.forEach((p: any) => {
+                  const position = new Position();
+                  position.name = p.name;
+                  position.callsign = p.callsign;
+                  position.frequency = parseInt(
+                    p.frequency.toString().substr(0, 6),
+                  );
+                  position.facility = c2f;
+                  position.panelType = facility.eramConfiguration
+                    ? PanelType.VSCS
+                    : PanelType.RDVS;
+                  position.sector = p.eramConfiguration
+                    ? p.eramConfiguration.sectorId
+                    : p.starsConfiguration
+                      ? p.starsConfiguration.sectorId
+                      : p.callsign.split('_')[p.callsign.split('_').length - 1];
+                  positions.push(position);
                 });
-              })
-              .catch((err) => this.logger.error(`Error creating artcc ${err}`));
+                facilities.push(c2f);
+
+                c2.childFacilities.forEach((c3: any) => {
+                  if (!c3.id) return;
+
+                  const c3f = new Facility();
+                  c3f.id = c3.id;
+                  c3f.parentFacility = c2f;
+                  c3.positions.forEach((p: any) => {
+                    const position = new Position();
+                    position.name = p.name;
+                    position.callsign = p.callsign;
+                    position.frequency = parseInt(
+                      p.frequency.toString().substr(0, 6),
+                    );
+                    position.facility = c3f;
+                    position.panelType = facility.eramConfiguration
+                      ? PanelType.VSCS
+                      : PanelType.RDVS;
+                    position.sector = p.eramConfiguration
+                      ? p.eramConfiguration.sectorId
+                      : p.starsConfiguration
+                        ? p.starsConfiguration.sectorId
+                        : p.callsign.split('_')[
+                            p.callsign.split('_').length - 1
+                          ];
+                    positions.push(position);
+                  });
+                  facilities.push(c3f);
+
+                  c3.childFacilities.forEach((c4: any) => {
+                    if (!c4.id) return;
+
+                    this.logger.debug(`c4 Create facility ${c4.id}`);
+                    const c4f = new Facility();
+                    c4f.id = c4.id;
+                    c4f.parentFacility = c3f;
+                    c4.positions.forEach((p: any) => {
+                      const position = new Position();
+                      position.name = p.name;
+                      position.callsign = p.callsign;
+                      position.frequency = parseInt(
+                        p.frequency.toString().substr(0, 6),
+                      );
+                      position.facility = c4f;
+                      position.panelType = facility.eramConfiguration
+                        ? PanelType.VSCS
+                        : PanelType.RDVS;
+                      position.sector = p.eramConfiguration
+                        ? p.eramConfiguration.sectorId
+                        : p.starsConfiguration
+                          ? p.starsConfiguration.sectorId
+                          : p.callsign.split('_')[
+                              p.callsign.split('_').length - 1
+                            ];
+                      positions.push(position);
+                    });
+                    facilities.push(c4f);
+
+                    c4.childFacilities.forEach((c5: any) => {
+                      if (!c5.id) return;
+
+                      this.logger.debug(`c5 Create facility ${c5.id}`);
+                      const c5f = new Facility();
+                      c5f.id = c5.id;
+                      c5f.parentFacility = c4f;
+                      c5.positions.forEach((p: any) => {
+                        const position = new Position();
+                        position.name = p.name;
+                        position.frequency = parseInt(
+                          p.frequency.toString().substr(0, 6),
+                        );
+                        position.facility = c5f;
+                        position.callsign = p.callsign;
+                        position.panelType = facility.eramConfiguration
+                          ? PanelType.VSCS
+                          : PanelType.RDVS;
+                        position.sector = p.eramConfiguration
+                          ? p.eramConfiguration.sectorId
+                          : p.starsConfiguration
+                            ? p.starsConfiguration.sectorId
+                            : p.callsign.split('_')[
+                                p.callsign.split('_').length - 1
+                              ];
+                        positions.push(position);
+                      });
+                      facilities.push(c5f);
+
+                      c5.childFacilities.forEach((c6: any) => {
+                        if (!c6.id) return;
+
+                        this.logger.debug(`c6 Create facility ${c6.id}`);
+                        const c6f = new Facility();
+                        c6f.id = c6.id;
+                        c6f.parentFacility = c5f;
+                        c6.positions.forEach((p: any) => {
+                          const position = new Position();
+                          position.name = p.name;
+                          position.callsign = p.callsign;
+                          position.frequency = parseInt(
+                            p.frequency.toString().substr(0, 6),
+                          );
+                          position.facility = c6f;
+                          position.panelType = facility.eramConfiguration
+                            ? PanelType.VSCS
+                            : PanelType.RDVS;
+                          position.sector = p.eramConfiguration
+                            ? p.eramConfiguration.sectorId
+                            : p.starsConfiguration
+                              ? p.starsConfiguration.sectorId
+                              : p.callsign.split('_')[
+                                  p.callsign.split('_').length - 1
+                                ];
+                          positions.push(position);
+                        });
+                        facilities.push(c6f);
+                      });
+                    });
+                  });
+                });
+              });
+            });
           });
+
+          this.logger.debug('saving artccs');
+          await this.dataSource.getRepository(Facility).save(facilities);
+          this.logger.debug('done saving artccs');
+          this.logger.debug('saving positions');
+          await this.dataSource
+            .getRepository(Position)
+            .createQueryBuilder()
+            .insert()
+            .values(positions)
+            .orIgnore()
+            .execute();
+          this.logger.debug('done saving positions');
+          const editor = new Editor();
+          editor.cid = 1369362;
+          editor.facility = nas;
+          editor.addedBy = 800000;
+          await this.dataSource.getRepository(Editor).save(editor);
+          this.logger.debug('SEEDING DONE');
         } catch (err) {
           this.logger.error(`Error fetching ARTCCs ${err}`);
         }
@@ -165,34 +303,20 @@ export class ConfigurationService {
     return await this.dataSource.manager.save(newF);
   }
 
-  async findAllFacilities() {
-    const start = performance.now();
-    const retval = await this.dataSource.getTreeRepository(Facility).findTrees({
-      relations: [
-        'parentFacility',
-        'childFacilities',
-        'positions',
-        'editors',
-        'positions.facility',
-        'positions.configurations',
-        'positions.configurations.layouts',
-        'childFacilities.positions',
-        'childFacilities.positions.facility',
-        'childFacilities.positions.configurations',
-        'childFacilities.positions.configurations.layouts',
-        'childFacilities.childFacilities',
-      ],
+  async findOneFacility(facilityId: string) {
+    const facility = await this.dataSource.getTreeRepository(Facility).findOne({
+      where: { id: facilityId },
     });
-
-    this.logger.debug(
-      `findAllFacilities took ${performance.now() - start}ms to execute`,
-    );
+    const retval = await this.dataSource
+      .getTreeRepository(Facility)
+      .findDescendants(facility!, {
+        relations: ['parentFacility', 'childFacilities', 'buttons'],
+      });
 
     return retval;
   }
 
   async findVisibleFacilities(cid: number) {
-    const start = performance.now();
     const approvedFacilities = await this.dataSource
       .getRepository(Editor)
       .find({
@@ -205,86 +329,45 @@ export class ConfigurationService {
     let retval: Facility[] = [];
     await Promise.all(
       approvedFacilities.map(async (editor: Editor) => {
-        const data = await this.findFacilityById(editor.facility.id);
+        const data = await this.findOneFacility(editor.facility.id);
         if (data) {
           retval = retval.concat(data);
         }
       }),
     );
-    this.logger.debug(
-      `findVisibleFacilities took ${performance.now() - start} to execute`,
-    );
-    return retval;
+
+    return retval.sort((a, b) => ('' + a.id).localeCompare(b.id));
   }
 
   async findOneFacilityById(facilityId: string) {
-    const start = performance.now();
     const data: Facility | null = await this.dataSource
       .getTreeRepository(Facility)
-      .findOne({
-        where: { id: facilityId },
-        relations: [
-          'parentFacility',
-          'childFacilities',
-          'positions',
-          'positions.facility',
-          'editors',
-          'positions.configurations',
-          'positions.configurations.layouts',
-          'childFacilities.childFacilities',
-        ],
-      });
+      .createQueryBuilder('facility')
+      .where({
+        id: facilityId,
+      })
+      .leftJoinAndSelect('facility.parentFacility', 'parentFacility')
+      .leftJoinAndSelect('facility.childFacilities', 'childFacilities')
+      .leftJoinAndSelect('facility.editors', 'editors')
+      .leftJoinAndSelect('facility.positions', 'positions')
+      .select([
+        'facility',
+        'parentFacility.id',
+        'childFacilities.id',
+        'editors',
+        'positions',
+      ])
+      .getOne();
 
-    data?.childFacilities.sort((a, b) => ('' + a.id).localeCompare(b.id));
-    data?.positions.sort((a, b) => ('' + a.sector).localeCompare(b.sector));
+    if (!data) throw new BadRequestException();
 
-    this.logger.debug(
-      `findOneFacilityById took ${performance.now() - start} to execute`,
-    );
+    data.childFacilities?.sort((a, b) => ('' + a.id).localeCompare(b.id));
+    data.positions?.sort((a, b) => ('' + a.sector).localeCompare(b.sector));
 
     return data;
   }
 
-  async findFacilityById(facilityId: string) {
-    const start = performance.now();
-    const facility: Facility | null = await this.dataSource
-      .getTreeRepository(Facility)
-      .findOne({
-        where: { id: facilityId },
-        relations: [
-          'parentFacility',
-          'childFacilities',
-          'positions',
-          'positions.facility',
-          'editors',
-          'positions.configurations',
-          'positions.configurations.layouts',
-          'childFacilities.childFacilities',
-        ],
-      });
-
-    if (!facility) throw new BadRequestException();
-
-    const data = [];
-    data.push(facility);
-    await Promise.all(
-      facility.childFacilities.map(async (cf) => {
-        const cfData = await this.findFacilityById(cf.id);
-        data.push(cfData);
-      }),
-    );
-
-    const retval = data.flat();
-
-    this.logger.debug(
-      `findFacilityById took ${performance.now() - start} to execute`,
-    );
-
-    return retval;
-  }
-
   async updateFacility(facilityId: string, facility: Facility) {
-    const start = performance.now();
     const f = new Facility();
     Object.assign(f, facility);
     f.id = facilityId;
@@ -298,29 +381,20 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.getRepository(Facility).save(f);
 
-    this.logger.debug(
-      `updateFacility took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deleteFacility(facilityId: string) {
-    const start = performance.now();
     const retval = await this.dataSource
       .getRepository(Facility)
       .softDelete(facilityId);
 
-    this.logger.debug(
-      `deleteFacility took ${performance.now() - start} to execute`,
-    );
     return retval;
   }
   //#endregion
 
   //#region Editor
   async createEditor(editor: Editor, addedBy: string) {
-    const start = performance.now();
     const e = new Editor();
     Object.assign(e, editor);
     e.addedBy = parseInt(addedBy);
@@ -334,20 +408,11 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.manager.save(e);
 
-    this.logger.debug(
-      `createEditor took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deleteEditor(editorId: string) {
-    const start = performance.now();
     const retval = await this.dataSource.getRepository(Editor).delete(editorId);
-
-    this.logger.debug(
-      `deleteEditor took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -358,7 +423,6 @@ export class ConfigurationService {
     position: Position,
     facilityId: string,
   ): Promise<Position> {
-    const start = performance.now();
     const facility = await this.findOneFacilityById(facilityId);
     if (!facility) throw new BadRequestException();
 
@@ -374,16 +438,23 @@ export class ConfigurationService {
     }
 
     const retval = await this.dataSource.manager.save(p);
-
-    this.logger.debug(
-      `createPosition took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
-  async findAllPositions(facility: string) {
-    const start = performance.now();
+  async findAppPositions() {
+    const p = await this.dataSource.getRepository(Position).find({
+      relations: [
+        'facility',
+        'configurations',
+        'configurations.layouts',
+        'configurations.layouts.button',
+      ],
+    });
+
+    return p;
+  }
+
+  async findAllPositionsByFacilityId(facility: string) {
     const f = await this.dataSource.getRepository(Facility).findOne({
       where: { id: facility },
       relations: {
@@ -392,69 +463,55 @@ export class ConfigurationService {
     });
     if (!f) throw new BadRequestException();
 
-    this.logger.debug(
-      `findAllPositions took ${performance.now() - start} to execute`,
-    );
-
     return f.positions;
   }
 
   async findPositionById(positionId: string): Promise<Position | null> {
-    const start = performance.now();
-
     const retval = await this.dataSource.getRepository(Position).findOne({
       where: { id: positionId },
-      relations: [
-        'facility',
-        'facility.parentFacility',
-        'configurations',
-        'configurations.layouts',
-        'configurations.layouts.button',
-        'configurations.positions',
-      ],
+      relations: ['facility', 'facility.parentFacility', 'configurations'],
     });
 
-    this.logger.debug(
-      `findPositionById took ${performance.now() - start} to execute`,
-    );
+    return retval;
+  }
+
+  async findPositionByIdOnlyFacility(
+    positionId: string,
+  ): Promise<Position | null> {
+    const retval = await this.dataSource.getRepository(Position).findOne({
+      where: { id: positionId },
+      relations: ['facility'],
+    });
 
     return retval;
   }
 
   async findPositionByCallsignPrefix(
     callsign: string,
-  ): Promise<Position | null> {
-    const start = performance.now();
-
-    const all = await this.dataSource
+    frequency: string | number,
+  ): Promise<Position> {
+    const freq = parseInt(frequency.toString().replace('.', ''));
+    const parts = callsign.split('_');
+    const match = await this.dataSource
       .getRepository(Position)
-      .find({ select: ['id', 'callsignPrefix'] });
+      .createQueryBuilder('position')
+      .where({
+        frequency: freq,
+        callsign: Like(`${parts[0]}_%_${parts[parts.length - 1]}`),
+      })
+      .leftJoinAndSelect('position.facility', 'facility')
+      .leftJoinAndSelect('position.configurations', 'configs')
+      .leftJoinAndSelect('configs.layouts', 'layouts')
+      .leftJoinAndSelect('layouts.button', 'button')
+      .select(['position', 'facility.id', 'configs', 'layouts', 'button'])
+      .getOne();
 
-    const match = all.find((p) => callsign.startsWith(p.callsignPrefix));
-    if (match) {
-      const retval = await this.dataSource.getRepository(Position).findOne({
-        where: { id: match.id },
-        relations: [
-          'facility',
-          'facility.parentFacility',
-          'configurations',
-          'configurations.layouts',
-          'configurations.layouts.button',
-          'configurations.positions',
-        ],
-      });
+    if (!match) throw new NotFoundException();
 
-      this.logger.debug(
-        `findPositionByCallsignPrefix took ${performance.now() - start} to execute`,
-      );
-
-      return retval;
-    }
-    return null;
+    return match;
   }
 
   async findPositionByDialCode(code: string): Promise<Position | null> {
-    const start = performance.now();
     const retval = await this.dataSource.getRepository(Position).findOne({
       where: { dialCode: code },
       relations: [
@@ -466,10 +523,6 @@ export class ConfigurationService {
       ],
     });
 
-    this.logger.debug(
-      `findPositionByDialCode took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
@@ -477,7 +530,6 @@ export class ConfigurationService {
     positionId: string,
     position: Position,
   ): Promise<Position> {
-    const start = performance.now();
     const p = new Position();
     Object.assign(p, position);
     p.id = positionId;
@@ -490,23 +542,13 @@ export class ConfigurationService {
     }
     const retval = await this.dataSource.getRepository(Position).save(p);
 
-    this.logger.debug(
-      `updatePosition took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deletePosition(positionId: string): Promise<UpdateResult> {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(Position)
       .softDelete(positionId);
-
-    this.logger.debug(
-      `deletePosition took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -514,8 +556,6 @@ export class ConfigurationService {
 
   //#region Position Configuration
   async createPositionConfiguration(config: PositionConfiguration) {
-    const start = performance.now();
-
     const pc = new PositionConfiguration();
     Object.assign(pc, config);
 
@@ -528,16 +568,10 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.manager.save(pc);
 
-    this.logger.debug(
-      `createPositionConfiguration took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async findPositionConfigurationById(configId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .findOne({
@@ -545,26 +579,27 @@ export class ConfigurationService {
         relations: ['positions', 'layouts', 'layouts.button'],
       });
 
-    this.logger.debug(
-      `findPositionConfigurationById took ${performance.now() - start} to execute`,
-    );
+    return retval;
+  }
+
+  async findPositionConfigurationByIdNoLayouts(configId: string) {
+    const retval = await this.dataSource
+      .getRepository(PositionConfiguration)
+      .findOne({
+        where: { id: configId },
+        relations: ['positions'],
+      });
 
     return retval;
   }
 
   async findPositionConfigurationByName(name: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .findOne({
         where: { name },
         relations: ['positions', 'layouts', 'layouts.button'],
       });
-
-    this.logger.debug(
-      `findPositionConfigurationByName took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -573,13 +608,11 @@ export class ConfigurationService {
     configId: string,
     config: PositionConfigurationDto,
   ) {
-    const start = performance.now();
     const buttons = [...config.buttons];
-    const { name, id, positions } = config;
     const configuration = {
-      name,
-      id,
-      positions,
+      name: config.name,
+      id: configId,
+      positions: config.positions,
     };
     const pc = new PositionConfiguration();
     Object.assign(pc, configuration);
@@ -603,23 +636,13 @@ export class ConfigurationService {
       .getRepository(PositionConfiguration)
       .save(pc);
 
-    this.logger.debug(
-      `updatePositionConfiguration took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deletePositionConfiguration(configId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
       .softDelete(configId);
-
-    this.logger.debug(
-      `deletePositionConfiguration took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -627,7 +650,6 @@ export class ConfigurationService {
 
   //#region ConfigurationLayout
   async saveConfigurationLayout(layout: ConfigurationLayout) {
-    const start = performance.now();
     const lookup = await this.dataSource
       .getRepository(ConfigurationLayout)
       .findOne({
@@ -667,17 +689,12 @@ export class ConfigurationService {
       .getRepository(ConfigurationLayout)
       .save(l);
 
-    this.logger.debug(
-      `saveConfigurationLayout took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
   //#endregion
 
   //#region Button
   async createButton(button: Button, configurationId: string) {
-    const start = performance.now();
     // Preload information to assign to facility
     const config = await this.findPositionConfigurationById(configurationId);
     if (!config || !config.positions[0]) {
@@ -699,37 +716,25 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.manager.save(b);
 
-    this.logger.debug(
-      `createButton took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async getButtons(cid: string) {
-    const start = performance.now();
-    const visibleFacilities = await this.findVisibleFacilities(parseInt(cid));
-    if (!visibleFacilities) {
-      throw new BadRequestException(
-        'You are not authorized to view any facilities.',
-      );
-    }
+    console.time('approvedFacilities');
+    const approvedFacilities = await this.findVisibleFacilities(parseInt(cid));
 
-    const buttons: Button[] = [];
-    await Promise.all(
-      visibleFacilities.map(async (facility) => {
-        const btns = await this.dataSource.getRepository(Button).find({
-          where: {
-            facility: {
-              id: facility.id,
-            },
-          },
-        });
-        if (btns) {
-          buttons.push(...btns);
-        }
-      }),
-    );
+    const facilities = approvedFacilities.map((f) => f.id);
+    console.timeEnd('approvedFacilities');
+
+    console.time('visibleButtons');
+    const buttons = await this.dataSource.getRepository(Button).find({
+      where: {
+        facility: {
+          id: In(facilities),
+        },
+      },
+    });
+    console.timeEnd('visibleButtons');
 
     // Add a none button for every facility
     const noneButton = new Button();
@@ -740,32 +745,21 @@ export class ConfigurationService {
     noneButton.layouts = [];
     noneButton.id = '00000000-0000-0000-0000-000000000000';
 
-    this.logger.debug(
-      `getButtons took ${performance.now() - start} to execute`,
-    );
-
     return [
       noneButton,
-      ...buttons.sort((a, b) => ('' + a.shortName).localeCompare(b.shortName)),
+      ...buttons.sort((a, b) => ('' + a.target).localeCompare(b.target)),
     ];
   }
 
   async findButtonById(buttonId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(Button)
       .findOne({ where: { id: buttonId }, relations: ['configurations'] });
-
-    this.logger.debug(
-      `findButtonById took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
 
   async updateButton(buttonId: string, button: Button) {
-    const start = performance.now();
     const b = new Button();
     Object.assign(b, button);
     b.id = buttonId;
@@ -779,23 +773,13 @@ export class ConfigurationService {
 
     const retval = await this.dataSource.getRepository(Button).save(b);
 
-    this.logger.debug(
-      `updateButton took ${performance.now() - start} to execute`,
-    );
-
     return retval;
   }
 
   async deleteButton(buttonId: string) {
-    const start = performance.now();
-
     const retval = await this.dataSource
       .getRepository(Button)
       .softDelete(buttonId);
-
-    this.logger.debug(
-      `deleteButton took ${performance.now() - start} to execute`,
-    );
 
     return retval;
   }
@@ -803,7 +787,13 @@ export class ConfigurationService {
 
   //#region Authorization checks
   async isEditorOfFacility(cid: number, facilityId: string): Promise<boolean> {
-    const start = performance.now();
+    const cache = await this.cacheManager.get<boolean>(
+      `facility-${cid}-${facilityId}`,
+    );
+    if (cache !== undefined) {
+      this.logger.debug(`Using cache for facility, value: ${cache}`);
+      return cache;
+    }
     const approvedFacilities = await this.dataSource
       .getRepository(Editor)
       .find({
@@ -815,47 +805,39 @@ export class ConfigurationService {
 
     if (approvedFacilities.some((f) => f.facility.id === facilityId)) {
       // Direct match
-      this.logger.debug(
-        `isEditorOfFacility took ${performance.now() - start} to execute`,
-      );
-
+      this.cacheManager.set(`facility-${cid}-${facilityId}`, true);
       return true;
-    } else {
-      const target = await this.dataSource
-        .getRepository(Facility)
-        .findOne({ where: { id: facilityId } });
-      if (!target) {
-        throw new InternalServerErrorException('Error find facility');
-      }
-
-      const tree = await this.dataSource
-        .getTreeRepository(Facility)
-        .findAncestorsTree(target);
-
-      if (!tree) throw new NotFoundException('Parent Facility not found');
-
-      let fac = tree.parentFacility;
-      while (fac) {
-        if (approvedFacilities.some((f) => f.facility.id === fac.id)) {
-          this.logger.debug(
-            `isEditorOfFacility took ${performance.now() - start} to execute`,
-          );
-
-          return true;
-        } else {
-          fac = fac.parentFacility;
-        }
-      }
-
-      this.logger.log(
-        `${cid} is not an editor of ${facilityId} or its parents.`,
-      );
-      this.logger.debug(
-        `isEditorOfFacility took ${performance.now() - start} to execute`,
-      );
-
-      throw new ForbiddenException(`Not an editor for ${facilityId}`);
     }
+
+    const target = await this.dataSource
+      .getRepository(Facility)
+      .findOne({ where: { id: facilityId } });
+    if (!target) {
+      throw new InternalServerErrorException('Error finding facility');
+    }
+
+    const tree = await this.dataSource
+      .getTreeRepository(Facility)
+      .findAncestorsTree(target);
+
+    if (!tree) throw new NotFoundException('Parent Facility not found');
+
+    let fac = tree.parentFacility;
+    while (fac) {
+      if (approvedFacilities.some((f) => f.facility.id === fac.id)) {
+        this.cacheManager.set(`facility-${cid}-${facilityId}`, true);
+        return true;
+      } else {
+        fac = fac.parentFacility;
+      }
+    }
+
+    this.logger.warn(
+      `${cid} is not an editor of ${facilityId} or its parents.`,
+    );
+    this.cacheManager.set(`facility-${cid}-${facilityId}`, false);
+
+    throw new ForbiddenException(`Not an editor for ${facilityId}`);
   }
 
   async isEditorOfPositions(
@@ -870,14 +852,17 @@ export class ConfigurationService {
   }
 
   async isEditorOfPosition(cid: number, positionId: string): Promise<boolean> {
-    const start = performance.now();
-    const position = await this.findPositionById(positionId);
+    const cache = await this.cacheManager.get<boolean>(
+      `position-${cid}-${positionId}`,
+    );
+    if (cache !== undefined) {
+      this.logger.debug(`Using cache for position, value: ${cache}`);
+      return cache;
+    }
+    const position = await this.findPositionByIdOnlyFacility(positionId);
     if (!position) throw new NotFoundException();
     const retval = await this.isEditorOfFacility(cid, position.facility.id);
-
-    this.logger.debug(
-      `isEditorOfPosition took ${performance.now() - start} to execute`,
-    );
+    this.cacheManager.set(`position-${cid}-${positionId}`, retval, 300000);
 
     return retval;
   }
@@ -886,23 +871,31 @@ export class ConfigurationService {
     cid: number,
     configuration: string,
   ): Promise<boolean> {
-    const start = performance.now();
-    const config = await this.findPositionConfigurationById(configuration);
+    const cache = await this.cacheManager.get<boolean>(
+      `configurations-${cid}-${configuration}`,
+    );
+    if (cache !== undefined) {
+      this.logger.debug(`Using cache for configuration, value: ${cache}`);
+      return cache;
+    }
+    const config =
+      await this.findPositionConfigurationByIdNoLayouts(configuration);
     if (!config) throw new BadRequestException();
     const positions: Position[] = [];
     await Promise.all(
       config.positions.map(async (p) => {
-        const data = await this.findPositionById(p.id);
+        const data = await this.findPositionByIdOnlyFacility(p.id);
         if (data) positions.push(data);
       }),
     );
 
     const retval = await this.isEditorOfPositions(cid, positions);
 
-    this.logger.debug(
-      `isEditorOfConfiguration took ${performance.now() - start} to execute`,
+    this.cacheManager.set(
+      `configurations-${cid}-${configuration}`,
+      retval,
+      300000,
     );
-
     return retval;
   }
   //#endregion

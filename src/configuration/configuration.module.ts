@@ -1,4 +1,5 @@
 import { HttpModule } from '@nestjs/axios';
+import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -27,6 +28,7 @@ import { Position } from './entities/position.entity';
       Button,
     ]),
     HttpModule,
+    CacheModule.register(),
   ],
   exports: [TypeOrmModule, ConfigurationService],
 })
