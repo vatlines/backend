@@ -7,6 +7,8 @@ export class LoggerMiddleware implements NestMiddleware {
   private readonly logger = new Logger();
 
   use(request: Request, response: Response, next: NextFunction): void {
+    if (request.path === '/') return next();
+
     const start = performance.now();
 
     response.on('finish', () => {
