@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthGuard } from 'src/auth/auth.guard';
+import { ApiKeyGuard } from '../api-key.guard';
 import { ConfigurationService } from './configuration.service';
 import { Button } from './entities/button.entity';
 import { Editor } from './entities/editor.entity';
@@ -32,7 +33,6 @@ import {
   PositionConfigurationGuard,
   PositionGuard,
 } from './guards';
-import { ApiKeyGuard } from './guards/api-key.guard';
 import { RequestIdInterceptor } from './id.interceptor';
 
 @Controller({
