@@ -56,6 +56,7 @@ export class VatsimDataService {
       cid: input.cid,
       callsign: input.callsign,
       frequency: input.frequency,
+      last_updated: '2099-01-01T23:48:55.6043769Z',
     });
   }
 
@@ -82,6 +83,7 @@ type Controller = {
   cid: number;
   callsign: string;
   frequency: string;
+  last_updated: string;
 };
 
 export type AddOverrideDto = {

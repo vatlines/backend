@@ -8,5 +8,6 @@ import { VatsimDataService } from './vatsim-data.service';
   controllers: [VatsimDataController],
   providers: [VatsimDataService],
   imports: [HttpModule, ConfigModule],
+  exports: [VatsimDataService],
 })
 export class VatsimDataModule {}

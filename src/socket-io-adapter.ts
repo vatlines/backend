@@ -96,6 +96,7 @@ export class SocketIOAdapter extends IoAdapter {
       if (process.env.NODE_ENV === 'development') {
         socket.callsign = 'CHI_Z_APP';
         socket.frequency = '119.000';
+        socket.lastUpdated = new Date();
         next();
         return;
       }
@@ -105,6 +106,7 @@ export class SocketIOAdapter extends IoAdapter {
         if (match) {
           socket.callsign = match.callsign;
           socket.frequency = match.frequency;
+          socket.lastUpdated = new Date(match.last_updated);
           next();
         } else {
           next(new Error(`No active controlling session found.`));
@@ -171,6 +173,7 @@ type AuthPayload = {
 
 type OnlinePayload = {
   callsign: string;
+  lastUpdated: Date;
 };
 
 type ConfigPayload = {
