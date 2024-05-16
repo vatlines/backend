@@ -94,9 +94,18 @@ export class SocketIOAdapter extends IoAdapter {
     (vatsimService: VatsimDataService, logger: Logger) =>
     (socket: SocketWithAuth, next: any) => {
       if (process.env.NODE_ENV === 'development') {
-        socket.callsign = 'CHI_Z_APP';
-        socket.frequency = '119.000';
-        socket.lastUpdated = new Date();
+        if (socket.cid === 10000003) {
+          // socket.callsign = 'CHI_B_DEP';
+          // socket.frequency = '125.000';
+          socket.callsign = 'CHI_64_CTR';
+          socket.frequency = '133.300';
+        } else {
+          socket.callsign = 'CHI_Z_APP';
+          socket.frequency = '119.000';
+          // socket.callsign = 'CHI_81_CTR';
+          // socket.frequency = '120.350';
+        }
+        socket.lastUpdated = new Date('2099-01-01T23:48:55.6043769Z');
         next();
         return;
       }

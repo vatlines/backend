@@ -227,6 +227,12 @@ export class ConfigurationController {
     return await this.configurationService.findButtonById(id);
   }
 
+  @Get('button/by-configuration/:id')
+  @UseGuards(AuthGuard)
+  async getConfigurationButtons(@Param('id') id: number) {
+    return await this.configurationService.findButtonsByConfiguration(id);
+  }
+
   @Post('button')
   @UseGuards(AuthGuard, ButtonGuard)
   @HttpCode(HttpStatus.CREATED)

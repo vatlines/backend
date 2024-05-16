@@ -760,6 +760,42 @@ export class ConfigurationService {
     ];
   }
 
+  async findButtonsByConfiguration(configurationId: number) {
+    const config = await this.dataSource
+      .getRepository(PositionConfiguration)
+      .findOne({
+        where: {
+          id: configurationId,
+        },
+        relations: ['positions', 'positions.facility'],
+        relationLoadStrategy: 'query',
+      });
+
+    if (!config) throw new BadRequestException();
+
+    const retval = await this.dataSource.getRepository(Button).find({
+      where: {
+        facility: {
+          facilityId: config.positions[0].facility.facilityId,
+        },
+      },
+    });
+
+    // Add a none button for every facility
+    const noneButton = new Button();
+    noneButton.shortName = 'NONE';
+    noneButton.longName = 'NONE';
+    noneButton.target = 'NONE';
+    noneButton.type = ButtonType.NONE;
+    noneButton.layouts = [];
+    noneButton.id = 0;
+
+    return [
+      noneButton,
+      ...retval.sort((a, b) => ('' + a.target).localeCompare(b.target)),
+    ];
+  }
+
   async findButtonById(buttonId: number) {
     const retval = await this.dataSource
       .getRepository(Button)
