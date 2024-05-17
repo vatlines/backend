@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   ConnectedSocket,
   MessageBody,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/websockets';
 import { randomUUID, UUID } from 'crypto';
 import { Server } from 'socket.io';
+import { VatsimDataService } from 'src/vatsim-data/vatsim-data.service';
 import { SocketWithAuth } from '../socket-io-adapter';
 import {
   CALL_TYPE,
@@ -26,9 +28,9 @@ export class SocketGateway
 {
   private readonly logger = new Logger(SocketGateway.name);
   private activeLandlines: Landline[] = [];
-  private sockets: string[] = [];
+  private sockets: SocketWithAuth[] = [];
 
-  constructor() {}
+  constructor(private readonly vatsimDataService: VatsimDataService) {}
 
   @WebSocketServer() io: Server;
 
@@ -49,6 +51,8 @@ export class SocketGateway
         (s) => !s.includes(s) && s.length < 10,
       ),
     );
+
+    this.sockets.push(client);
 
     client.on('disconnecting', () => {
       this.io.emit('disconnected', client.id);
@@ -75,9 +79,32 @@ export class SocketGateway
     this.logger.log(
       `${client.cid} on ${client.sector} has disconnected (${client.id})`,
     );
-    if (this.sockets.indexOf(client.id) !== -1) {
-      this.sockets.splice(this.sockets.indexOf(client.id), 1);
+    if (this.sockets.findIndex((c) => client.id === c.id) !== -1) {
+      this.sockets.splice(
+        this.sockets.findIndex((c) => c.id === client.id),
+        1,
+      );
     }
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async checkConnections() {
+    const data = this.vatsimDataService.getVatsimData();
+    this.sockets.forEach((socket) => {
+      const match = data.find(
+        (c) =>
+          Number(c.cid) === Number(socket.cid) &&
+          c.callsign === socket.callsign,
+      );
+      if (match) {
+        socket.lastUpdated = new Date(match.last_updated);
+      } else if (Date.now() - socket.lastUpdated.getTime() > 5 * 60 * 1000) {
+        this.logger.log(
+          `${socket.cid} (${socket.id}) is no longer connected to the network. Dropping.`,
+        );
+        socket.disconnect();
+      }
+    });
   }
 
   @SubscribeMessage('initiate-landline')

@@ -1,12 +1,13 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class VatsimDataService {
   private readonly logger = new Logger(VatsimDataService.name);
-  private vatsimData: VatsimData = new VatsimData();
+  private vatsimData: Controller[] = [];
+  private overrides: Controller[] = [];
 
   constructor(private readonly httpService: HttpService) {
     this.downloadData();
@@ -23,72 +24,49 @@ export class VatsimDataService {
         )
       ).data;
 
-      this.vatsimData = data as VatsimData;
-      const tmp = new VatsimData();
-      tmp.controllers = [
-        {
-          cid: 1369362,
-
-          name: 'Ryan',
-
-          callsign: 'ORD_S_TWR',
-
-          frequency: '120.750',
-
-          facility: 4,
-
-          rating: 8,
-
-          server: 'VIRTUALNAS',
-
-          visual_range: 50,
-
-          text_atis: null,
-
-          last_updated: '2024-04-27T23:54:11.8506514Z',
-
-          logon_time: '2024-04-27T23:53:10.3574456Z',
-        },
-        {
-          cid: 1666291,
-
-          name: 'lucas channnnnnnnnn',
-
-          callsign: 'ORD_I_GND',
-
-          frequency: '121.900',
-
-          facility: 4,
-
-          rating: 8,
-
-          server: 'VIRTUALNAS',
-
-          visual_range: 50,
-
-          text_atis: null,
-
-          last_updated: '2024-04-27T23:54:11.8506514Z',
-
-          logon_time: '2024-04-27T23:53:10.3574456Z',
-        },
-      ];
-      if (process.env.NODE_ENV !== 'production') {
-        this.vatsimData = tmp;
-      }
+      this.vatsimData = (data as VatsimData).controllers;
     } catch (err) {
       this.logger.error(`Error downloading Vatsim data: ${err}`);
-      this.vatsimData = new VatsimData();
+      this.vatsimData = [];
+    } finally {
+      this.vatsimData = this.vatsimData.concat(this.overrides);
     }
   }
 
-  getVatsimData(): VatsimData {
+  getVatsimData(): Controller[] {
     return this.vatsimData;
   }
 
   isControllerActive(cid: number): Controller | undefined {
-    return this.vatsimData.controllers.find(
+    return this.vatsimData.find(
       (c) => Number(c.cid) === Number(cid) && c.frequency !== '199.998',
+    );
+  }
+
+  async getOverrides() {
+    return this.overrides;
+  }
+
+  async addOverride(input: AddOverrideDto) {
+    if (this.overrides.find((o) => Number(o.cid) === Number(input.cid))) {
+      throw new BadRequestException(`CID already has an override.`);
+    }
+
+    this.overrides.push({
+      cid: input.cid,
+      callsign: input.callsign,
+      frequency: input.frequency,
+      last_updated: '2099-01-01T23:48:55.6043769Z',
+    });
+  }
+
+  async deleteOverride(cid: number) {
+    if (!this.overrides.find((o) => Number(o.cid) === Number(cid))) {
+      throw new BadRequestException();
+    }
+
+    this.overrides = this.overrides.filter(
+      (o) => Number(o.cid) !== Number(cid),
     );
   }
 }
@@ -103,14 +81,13 @@ class VatsimData {
 
 type Controller = {
   cid: number;
-  name: string;
   callsign: string;
   frequency: string;
-  facility: number;
-  rating: number;
-  server: string;
-  visual_range: number;
-  text_atis: string[] | null;
   last_updated: string;
-  logon_time: string;
+};
+
+export type AddOverrideDto = {
+  cid: number;
+  callsign: string;
+  frequency: string;
 };
