@@ -1,6 +1,6 @@
 {
   "name": "vatlines-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Backend REST API and Socket.IO server for the VATLines application.",
   "author": "Ryan Savara",
   "private": true,
