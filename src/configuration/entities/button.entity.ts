@@ -52,12 +52,11 @@ export class Button {
     enum: [
       ButtonType.SHOUT,
       ButtonType.OVERRIDE,
-      ButtonType.INTERCOM,
       ButtonType.RING,
       ButtonType.NONE,
       ButtonType.CONVERTED_SHOUT,
     ],
-    // enum: ['SHOUT', 'OVERRIDE', 'INTERCOM', 'RING', 'NONE', 'CONVERTED_SHOUT'],
+    // enum: ['SHOUT', 'OVERRIDE', 'RING', 'NONE', 'CONVERTED_SHOUT'],
   })
   type: ButtonType;
 

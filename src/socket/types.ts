@@ -3,7 +3,6 @@ import { UUID } from 'crypto';
 export enum CALL_TYPE {
   SHOUT = 'SHOUT',
   OVERRIDE = 'OVERRIDE',
-  INTERCOM = 'INTERCOM',
   RING = 'RING',
   CONVERTED_SHOUT = 'CONVERTED_SHOUT',
 }

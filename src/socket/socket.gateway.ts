@@ -164,10 +164,6 @@ export class SocketGateway
         this.io.to(data.to).emit('join-landline', uuid);
         break;
       }
-      case CALL_TYPE.INTERCOM: {
-        this.logger.log(`${client.cid} initiated a INTERCOM to ${data.to}`);
-        break;
-      }
       default: {
         // RING
         this.logger.log(`${client.cid} initiated a RING to ${data.to}`);
