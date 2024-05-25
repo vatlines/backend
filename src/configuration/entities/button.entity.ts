@@ -3,6 +3,7 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -45,6 +46,7 @@ export class Button {
   @IsNotEmpty()
   @IsString()
   @MinLength(3)
+  @Matches(/^([0-9]{3,4}|[A-Z0-9]{3,4}(-[A-Z0-9]+)?)$/)
   target!: string;
 
   @Column({
@@ -56,7 +58,6 @@ export class Button {
       ButtonType.NONE,
       ButtonType.CONVERTED_SHOUT,
     ],
-    // enum: ['SHOUT', 'OVERRIDE', 'RING', 'NONE', 'CONVERTED_SHOUT'],
   })
   type: ButtonType;
 

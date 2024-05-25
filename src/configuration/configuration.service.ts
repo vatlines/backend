@@ -720,10 +720,19 @@ export class ConfigurationService {
     Object.assign(b, button);
     b.facility = position.facility;
 
+    // Schema validation
     const errors = await validate(b);
     if (errors.length > 0) {
       throw new BadRequestException(
         `Validation failed! ${errors.map((z) => z.constraints![Object.keys(z.constraints!)[0]]).join(', ')}`,
+      );
+    }
+
+    // Logic validation
+    const validButton = await this.validateButton(b);
+    if (!validButton) {
+      throw new BadRequestException(
+        `Invalid button type (${b.type}) for target (${b.target})`,
       );
     }
 
@@ -809,11 +818,18 @@ export class ConfigurationService {
     Object.assign(b, button);
     b.id = buttonId;
 
+    // Schema validation
     const errors = await validate(b);
     if (errors.length > 0) {
       throw new BadRequestException(
         `Validation failed! ${errors.map((z) => z.constraints![Object.keys(z.constraints!)[0]]).join(', ')}`,
       );
+    }
+
+    // Logic validation
+    const validButton = await this.validateButton(button);
+    if (!validButton) {
+      throw new BadRequestException();
     }
 
     const retval = await this.dataSource.getRepository(Button).save(b);
@@ -827,6 +843,66 @@ export class ConfigurationService {
       .softDelete(buttonId);
 
     return retval;
+  }
+
+  async validateButton(button: Button): Promise<boolean> {
+    if (button.type === ButtonType.SHOUT) {
+      // Shouts can only go to entire facilities
+      return /^[A-Z0-9]{3,4}$/.test(button.target);
+    }
+
+    // Target not specific enough for button type
+    if (/^[A-Z0-9]{3,4}$/.test(button.target)) {
+      return false;
+    }
+
+    // Direct match, button is targeting same facility
+    const targetFacilityId = button.target.split('-')[0];
+    if (button.facility.facilityId === targetFacilityId) return true;
+
+    const targetFacility = await this.dataSource
+      .getRepository(Facility)
+      .findOneOrFail({
+        where: {
+          facilityId: targetFacilityId,
+        },
+      });
+
+    if (!targetFacility)
+      throw new BadRequestException('Unknown target facility');
+
+    const ancestors = await this.dataSource
+      .getTreeRepository(Facility)
+      .findAncestors(targetFacility);
+
+    // Button is targeting a descendent of the facility
+    if (
+      ancestors &&
+      ancestors.some((a) => a.facilityId === button.facility.facilityId)
+    ) {
+      return true;
+    }
+
+    const buttonAncestors = await this.dataSource
+      .getTreeRepository(Facility)
+      .findAncestors(button.facility);
+
+    // Button is targeting an ancestor of the facility
+    if (
+      buttonAncestors &&
+      buttonAncestors.some((b) => b.facilityId === targetFacilityId)
+    ) {
+      return true;
+    }
+
+    const intersection = ancestors
+      .filter((f) => buttonAncestors.some((b) => b.facilityId === f.facilityId))
+      .filter((f) => f.facilityId !== 'NAS');
+
+    // Button target and facility overlap by at least one facility (adjacent facilities)
+    if (intersection.length > 0) return true;
+
+    return false;
   }
   //#endregion
 

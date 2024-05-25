@@ -18,7 +18,6 @@ export class ButtonGuard implements CanActivate {
     const configuration = sqids.desanitizeProperties(
       request.body.configuration,
     ) as number;
-
     if (configuration) {
       return await this.configurationService.isEditorOfConfiguration(
         request.user.cid,
