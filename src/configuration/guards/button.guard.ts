@@ -16,7 +16,7 @@ export class ButtonGuard implements CanActivate {
     if (!request.user) return false;
     const sqids = new RequestIdInterceptor();
     const configuration = sqids.desanitizeProperties(
-      request.body.configuration,
+      request.body.configurationId,
     ) as number;
     if (configuration) {
       return await this.configurationService.isEditorOfConfiguration(
