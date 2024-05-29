@@ -20,6 +20,23 @@ async function bootstrap() {
   app.useLogger(app.get(Log4jsLogger));
 
   const configService = app.get(ConfigService);
+
+  if (
+    !configService.get('API_KEY') ||
+    !configService.get('SESSION_KEY') ||
+    !configService.get('AUTH_CLIENT_SECRET') ||
+    !configService.get('AUTH_CLIENT_ID') ||
+    !configService.get('AUTH_URL') ||
+    !configService.get('AUTH_REDIRECT_URI') ||
+    !configService.get('AUTH_SIGNING_KEY') ||
+    !configService.get('FRONTEND_URL') ||
+    !configService.get('ALPHABET')
+  ) {
+    logger.fatal('Required environment variable(s) not set.');
+    console.error('Required environment variable(s) not set.');
+    process.exit(1);
+  }
+
   const vatsimDataService = app.get(VatsimDataService);
   const configurationService = app.get(ConfigurationService);
   const port = parseInt(configService.get<string>('PORT') ?? '3001');
