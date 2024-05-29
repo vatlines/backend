@@ -69,6 +69,10 @@ export class VatsimDataService {
       (o) => Number(o.cid) !== Number(cid),
     );
   }
+
+  async deleteAllOverrides() {
+    this.overrides = [];
+  }
 }
 
 class VatsimData {

@@ -33,4 +33,8 @@ export class VatsimDataController {
   async deleteOverride(@Param('cid') cid: number) {
     return this.vatsimDataService.deleteOverride(cid);
   }
+  @Delete('/all')
+  async deleteAllOverrides() {
+    return this.vatsimDataService.deleteAllOverrides();
+  }
 }
