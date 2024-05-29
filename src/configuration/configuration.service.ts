@@ -85,7 +85,7 @@ export class ConfigurationService {
               );
               position.callsign = p.callsign;
               position.facility = f;
-              position.panelType = facility.eramConfiguration
+              position.panelType = position.callsign.endsWith('_CTR')
                 ? PanelType.VSCS
                 : PanelType.RDVS;
               position.sector = p.eramConfiguration
@@ -111,7 +111,7 @@ export class ConfigurationService {
                   p.frequency.toString().substr(0, 6),
                 );
                 position.facility = c1f;
-                position.panelType = facility.eramConfiguration
+                position.panelType = position.callsign.endsWith('_CTR')
                   ? PanelType.VSCS
                   : PanelType.RDVS;
                 position.sector = p.eramConfiguration
@@ -137,7 +137,7 @@ export class ConfigurationService {
                     p.frequency.toString().substr(0, 6),
                   );
                   position.facility = c2f;
-                  position.panelType = facility.eramConfiguration
+                  position.panelType = position.callsign.endsWith('_CTR')
                     ? PanelType.VSCS
                     : PanelType.RDVS;
                   position.sector = p.eramConfiguration
@@ -163,7 +163,7 @@ export class ConfigurationService {
                       p.frequency.toString().substr(0, 6),
                     );
                     position.facility = c3f;
-                    position.panelType = facility.eramConfiguration
+                    position.panelType = position.callsign.endsWith('_CTR')
                       ? PanelType.VSCS
                       : PanelType.RDVS;
                     position.sector = p.eramConfiguration
@@ -192,7 +192,7 @@ export class ConfigurationService {
                         p.frequency.toString().substr(0, 6),
                       );
                       position.facility = c4f;
-                      position.panelType = facility.eramConfiguration
+                      position.panelType = position.callsign.endsWith('_CTR')
                         ? PanelType.VSCS
                         : PanelType.RDVS;
                       position.sector = p.eramConfiguration
@@ -221,7 +221,7 @@ export class ConfigurationService {
                         );
                         position.facility = c5f;
                         position.callsign = p.callsign;
-                        position.panelType = facility.eramConfiguration
+                        position.panelType = position.callsign.endsWith('_CTR')
                           ? PanelType.VSCS
                           : PanelType.RDVS;
                         position.sector = p.eramConfiguration
@@ -250,7 +250,9 @@ export class ConfigurationService {
                             p.frequency.toString().substr(0, 6),
                           );
                           position.facility = c6f;
-                          position.panelType = facility.eramConfiguration
+                          position.panelType = position.callsign.endsWith(
+                            '_CTR',
+                          )
                             ? PanelType.VSCS
                             : PanelType.RDVS;
                           position.sector = p.eramConfiguration
