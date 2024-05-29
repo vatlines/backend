@@ -32,10 +32,14 @@ export class ConfigurationLayout {
     (config: PositionConfiguration) => config.layouts,
     {
       onDelete: 'SET NULL',
+      onUpdate: 'CASCADE',
     },
   )
   configuration: PositionConfiguration;
 
-  @ManyToOne(() => Button, (button: Button) => button.layouts)
+  @ManyToOne(() => Button, (button: Button) => button.layouts, {
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
   button: Button;
 }

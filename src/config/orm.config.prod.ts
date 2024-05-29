@@ -12,6 +12,7 @@ import {
 import {
   SchemaUpdate1715544622624,
   SchemaUpdate1716079288472,
+  SchemaUpdate1717026525198,
 } from '../migrations';
 dotenv.config();
 
@@ -29,7 +30,11 @@ export const databaseConfig: TypeOrmModuleOptions = {
     ConfigurationLayout,
     Button,
   ],
-  migrations: [SchemaUpdate1715544622624, SchemaUpdate1716079288472],
+  migrations: [
+    SchemaUpdate1715544622624,
+    SchemaUpdate1716079288472,
+    SchemaUpdate1717026525198,
+  ],
   // logging: true,
   maxQueryExecutionTime: process.env.NODE_ENV === 'production' ? 9999999 : 5000,
   retryAttempts: 1,

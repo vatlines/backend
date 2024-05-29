@@ -657,7 +657,7 @@ export class ConfigurationService {
   async deletePositionConfiguration(configId: number) {
     const retval = await this.dataSource
       .getRepository(PositionConfiguration)
-      .softDelete(configId);
+      .delete(configId);
 
     return retval;
   }
@@ -840,9 +840,7 @@ export class ConfigurationService {
   }
 
   async deleteButton(buttonId: number) {
-    const retval = await this.dataSource
-      .getRepository(Button)
-      .softDelete(buttonId);
+    const retval = await this.dataSource.getRepository(Button).delete(buttonId);
 
     return retval;
   }
