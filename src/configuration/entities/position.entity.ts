@@ -49,7 +49,8 @@ export class Position {
   sector: string;
 
   @ManyToOne(() => Facility, (facility: Facility) => facility.positions, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   })
   facility!: Facility;
 
@@ -63,7 +64,6 @@ export class Position {
 
   @Column({
     type: 'enum',
-    // enum: ['RDVS', 'VSCS']
     enum: [PanelType.RDVS, PanelType.VSCS],
   })
   @IsNotEmpty()
@@ -88,14 +88,18 @@ export class Position {
   @ManyToMany(
     () => PositionConfiguration,
     (configs: PositionConfiguration) => configs.positions,
-    {},
+    { onDelete: 'CASCADE' },
   )
   configurations: PositionConfiguration[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    name: 'created_at',
+  })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+  })
   updatedAt!: Date;
 
   @DeleteDateColumn({ name: 'deleted_at', select: false })

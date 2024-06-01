@@ -401,6 +401,7 @@ export class ConfigurationService {
 
   //#region Editor
   async createEditor(editor: Editor, addedBy: string) {
+    // @TODO: fix why this returns 403 when you have permission to edit
     const e = new Editor();
     Object.assign(e, editor);
     e.addedBy = parseInt(addedBy);

@@ -27,6 +27,7 @@ export class Editor {
 
   @ManyToOne(() => Facility, (facility: Facility) => facility.editors, {
     onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   })
   facility!: Facility;
 

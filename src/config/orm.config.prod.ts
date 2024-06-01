@@ -9,11 +9,7 @@ import {
   Position,
   PositionConfiguration,
 } from '../configuration/entities';
-import {
-  SchemaUpdate1715544622624,
-  SchemaUpdate1716079288472,
-  SchemaUpdate1717026525198,
-} from '../migrations';
+import { InitialDatabase1717275871694 } from '../migrations';
 dotenv.config();
 
 export const databaseConfig: TypeOrmModuleOptions = {
@@ -23,18 +19,14 @@ export const databaseConfig: TypeOrmModuleOptions = {
   password: process.env.DATABASE_PWD,
   database: process.env.DATABASE_DB,
   entities: [
-    Facility,
-    Editor,
-    Position,
-    PositionConfiguration,
-    ConfigurationLayout,
     Button,
+    ConfigurationLayout,
+    Editor,
+    Facility,
+    PositionConfiguration,
+    Position,
   ],
-  migrations: [
-    SchemaUpdate1715544622624,
-    SchemaUpdate1716079288472,
-    SchemaUpdate1717026525198,
-  ],
+  migrations: [InitialDatabase1717275871694],
   // logging: true,
   maxQueryExecutionTime: process.env.NODE_ENV === 'production' ? 9999999 : 5000,
   retryAttempts: 1,

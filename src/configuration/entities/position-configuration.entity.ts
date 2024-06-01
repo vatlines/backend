@@ -29,6 +29,7 @@ export class PositionConfiguration {
 
   @ManyToMany(() => Position, (position: Position) => position.configurations, {
     eager: true,
+    onDelete: 'CASCADE',
   })
   @JoinTable({ name: 'position_configurations_positions' })
   positions: Position[];
@@ -37,7 +38,6 @@ export class PositionConfiguration {
     () => ConfigurationLayout,
     (layout: ConfigurationLayout) => layout.configuration,
     {
-      onDelete: 'CASCADE',
       eager: true,
     },
   )

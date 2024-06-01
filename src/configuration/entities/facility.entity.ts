@@ -38,20 +38,16 @@ export class Facility {
   childFacilities: Facility[];
 
   @OneToMany(() => Position, (position: Position) => position.facility, {
-    onDelete: 'CASCADE',
     eager: true,
   })
   positions: Position[];
 
   @OneToMany(() => Editor, (editor: Editor) => editor.facility, {
-    onDelete: 'CASCADE',
     eager: true,
   })
   editors: Editor[];
 
-  @OneToMany(() => Button, (button: Button) => button.facility, {
-    onDelete: 'CASCADE',
-  })
+  @OneToMany(() => Button, (button: Button) => button.facility, {})
   buttons: Button[];
 
   @CreateDateColumn({ name: 'created_at' })

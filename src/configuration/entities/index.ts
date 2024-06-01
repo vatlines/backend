@@ -6,10 +6,10 @@ import { PositionConfiguration } from './position-configuration.entity';
 import { Position } from './position.entity';
 
 export {
-  Facility,
+  Button,
+  ConfigurationLayout,
   Editor,
+  Facility,
   Position,
   PositionConfiguration,
-  ConfigurationLayout,
-  Button,
 };

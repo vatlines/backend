@@ -71,14 +71,13 @@ export class Button {
   @OneToMany(
     () => ConfigurationLayout,
     (layout: ConfigurationLayout) => layout.button,
-    {
-      onDelete: 'CASCADE',
-    },
+    {},
   )
   layouts: ConfigurationLayout[];
 
   @ManyToOne(() => Facility, (facility: Facility) => facility.buttons, {
-    onDelete: 'SET NULL',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   })
   facility: Facility;
 

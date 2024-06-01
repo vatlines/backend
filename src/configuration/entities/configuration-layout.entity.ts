@@ -31,7 +31,7 @@ export class ConfigurationLayout {
     () => PositionConfiguration,
     (config: PositionConfiguration) => config.layouts,
     {
-      onDelete: 'SET NULL',
+      onDelete: 'CASCADE',
       onUpdate: 'CASCADE',
     },
   )
