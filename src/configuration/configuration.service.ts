@@ -400,10 +400,17 @@ export class ConfigurationService {
   //#endregion
 
   //#region Editor
-  async createEditor(editor: Editor, addedBy: string) {
-    // @TODO: fix why this returns 403 when you have permission to edit
+  async createEditor(
+    editor: { cid: number; facilityId: string },
+    addedBy: string,
+  ) {
+    const facility = await this.dataSource
+      .getRepository(Facility)
+      .findOne({ where: { facilityId: editor.facilityId } });
+    if (!facility) throw new BadRequestException(`Facility not found.`);
     const e = new Editor();
-    Object.assign(e, editor);
+    e.cid = editor.cid;
+    e.facility = facility;
     e.addedBy = parseInt(addedBy);
 
     const errors = await validate(e);

@@ -15,23 +15,21 @@ export class PositionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     if (!request.user) return false;
     const bodyFacility = request.body.facilityId;
-    const sqids = new RequestIdInterceptor();
-    const paramPosition = sqids.desanitizeProperties(
-      request.params.id,
-    ) as number;
 
     if (bodyFacility) {
       return await this.configurationService.isEditorOfFacility(
         request.user.cid,
         bodyFacility,
       );
-    } else if (paramPosition) {
+    } else {
+      const sqids = new RequestIdInterceptor();
+      const paramPosition = sqids.desanitizeProperties(
+        request.params.id,
+      ) as number;
       return await this.configurationService.isEditorOfPosition(
         request.user.cid,
         paramPosition,
       );
-    } else {
-      return false;
     }
   }
 }

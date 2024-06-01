@@ -18,7 +18,6 @@ import { AuthGuard } from 'src/auth/auth.guard';
 import { ApiKeyGuard } from '../api-key.guard';
 import { ConfigurationService } from './configuration.service';
 import { Button } from './entities/button.entity';
-import { Editor } from './entities/editor.entity';
 import { Facility } from './entities/facility.entity';
 import {
   PositionConfiguration,
@@ -96,7 +95,10 @@ export class ConfigurationController {
   @Post('editor')
   @UseGuards(AuthGuard, EditorGuard)
   @HttpCode(HttpStatus.CREATED)
-  async createEditor(@Req() request: RequestWithUser, @Body() input: Editor) {
+  async createEditor(
+    @Req() request: RequestWithUser,
+    @Body() input: { cid: number; facilityId: string },
+  ) {
     return await this.configurationService.createEditor(
       input,
       request.user.cid,
