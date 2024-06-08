@@ -242,7 +242,10 @@ export class SocketGateway
         this.logger.log(
           `${client.id} is turning shout into landline ${landline.id}`,
         );
-        this.io.to(landline.target).emit('left-landline');
+        this.io.to(landline.target).emit('left-landline', {
+          id: landline.id,
+          who: client.id,
+        });
         landline.type = CALL_TYPE.CONVERTED_SHOUT;
         landline.participants = landline.participants.filter(
           (p) => p === landline.initiator,
