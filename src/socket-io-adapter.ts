@@ -81,7 +81,7 @@ export class SocketIOAdapter extends IoAdapter {
         ) {
           next(new Error('Rating not approved for use of this application.'));
         } else {
-          socket.cid = payload.user.cid;
+          socket.cid = parseInt(`${payload.user.cid}`);
           next();
         }
       } catch (err) {
@@ -94,7 +94,7 @@ export class SocketIOAdapter extends IoAdapter {
     (vatsimService: VatsimDataService, logger: Logger) =>
     (socket: SocketWithAuth, next: any) => {
       if (process.env.NODE_ENV === 'development') {
-        if (socket.cid === 10000003) {
+        if (socket.cid === 10000002) {
           // socket.callsign = 'CHI_B_DEP';
           // socket.frequency = '125.000';
           socket.callsign = 'CHI_64_CTR';
