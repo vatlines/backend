@@ -87,7 +87,7 @@ export class SocketGateway
     }
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   async checkConnections() {
     const data = this.vatsimDataService.getVatsimData();
     this.sockets.forEach((socket) => {
@@ -98,7 +98,7 @@ export class SocketGateway
       );
       if (match) {
         socket.lastUpdated = new Date(match.last_updated);
-      } else if (Date.now() - socket.lastUpdated.getTime() > 5 * 60 * 1000) {
+      } else if (Date.now() - socket.lastUpdated.getTime() > 2.5 * 60 * 1000) {
         this.logger.log(
           `${socket.cid} (${socket.id}) is no longer connected to the network. Dropping.`,
         );
